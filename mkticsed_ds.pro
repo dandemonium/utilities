@@ -36,7 +36,7 @@ return,[u,sigu,v,sigv,b,sigb,y,sigy]
 
 end
 
-pro mkticsed_ds, ticid, priorfile=priorfile, france=france, ra=ra, dec=dec
+pro mkticsed_ds, ticid, priorfile=priorfile, rvfile=rvfile, france=france, ra=ra, dec=dec
 
 if !version.os_family eq 'Windows' then $
    message,'This program relies on queryvizier, which is not supported in Windows'
@@ -54,17 +54,19 @@ if lmgr(/vm) or lmgr(/runtime) then begin
          if strupcase(entries[0]) eq 'FRANCE' then france = long(entries[1])
          if strupcase(entries[0]) eq 'RA' then ra = double(entries[1])
          if strupcase(entries[0]) eq 'DEC' then dec = double(entries[1])
+         if strupcase(entries[0]) eq 'RVFILE' then rvfile = strtrim(entries[1],2) 
       endif
    endfor
 endif
 
+if ~keyword_set(rvfile) then rvfile='_'+string(ticid)+'.apogee.dr17.rv'
 if keyword_set(france) then cfa = 0B $
 else cfa = 1B
 
 ;; match RA/Dec to TICv8 (closest)
 if n_elements(ra) ne 0 and n_elements(dec) ne 0 then begin
    print, 'WARNING: querying by RA/Dec is less robust than querying by TIC ID and may lead to misidentification'   
-   qtic = exofast_queryvizier('IV/38/tic',[ra,dec],2d0, /silent, /all, cfa=cfa)
+   qtic = queryvizier('IV/38/tic',[ra,dec],2d0, /silent, /all, cfa=cfa)
    if (size(qtic))[2] ne 8 then begin
       print, 'No match to ' + string(ra,dec,format='(f0.8,",",f0.8)')
       return
@@ -82,12 +84,12 @@ dist = 120d0
 
 ;; query TICv8 for the TIC ID
 if strtrim(long(ticid),2) eq ticid then begin
-   qtic = Exofast_Queryvizier('IV/38/tic','TIC ' + strtrim(ticid,2),/allcolumns,cfa=cfa)
+   qtic = queryvizier('IV/38/tic','TIC ' + strtrim(ticid,2),/allcolumns,cfa=cfa)
 endif else begin
    ;; query by supplied name (less robust)
    print, 'WARNING: querying by name is less robust than querying by TIC ID and may lead to misidentification'
-   qtic = Exofast_Queryvizier('IV/38/tic',ticid,2d0,/allcolumns,cfa=cfa)
-   qgaia = Exofast_Queryvizier('I/345/gaia2',ticid,2d0,/allcolumns,cfa=cfa)   
+   qtic = queryvizier('IV/38/tic',ticid,2d0,/allcolumns,cfa=cfa)
+   qgaia = queryvizier('I/345/gaia2',ticid,2d0,/allcolumns,cfa=cfa)   
 
    sorted = sort(qgaia.gmag)
 
@@ -159,50 +161,10 @@ endelse
 
 ;; use the Gaia ID to query the Gaia catalog
 gaiaid = qtic.gaia
-qgaia=Exofast_Queryvizier('I/345/gaia2',star,dist/60.,/silent,cfa=cfa,/all)
-if (size(qgaia))[2] eq 8 then begin
-   match = (where(qgaia.source eq gaiaid))[0]
-   if match ne -1 then begin
-      qgaia = qgaia[match]
-      
-      if finite(qgaia.plx) and finite(qgaia.e_plx) and qgaia.plx gt 0d0 then begin
-         ;; gaia parallax prior 
-         ;; with Stassun & Torres correction
-;         printf, priorlun, qgaia.plx + 0.082d0, sqrt(qgaia.e_plx^2 + 0.033d0^2), format='("parallax",x,f0.5,x,f0.5)'
-         ;; with Lindegren+ 2018 correction
-         k = 1.08d0
-         if qgaia.gmag le 13d0 then begin
-            sigma_s = 0.021d0
-         endif else begin
-            sigma_s = 0.043d0
-         endelse
-         printf, priorlun, "# NOTE: the Gaia DR2 parallax (" + strtrim(qgaia.plx,2) + ") and uncertainty (" + strtrim(qgaia.e_plx,2) + ") has been corrected as prescribed in Lindegren+ (2018)"
-         corrected_plx = qgaia.plx + 0.030d0
-         if corrected_plx gt 0d0 then begin
-            printf, priorlun, corrected_plx, sqrt((k*qgaia.e_plx)^2 + sigma_s^2), format='("#parallax",x,f0.5,x,f0.5)'
-         endif else begin
-            printf, priorlun, '# WARNING: Negative parallax is not allowed. This is the corrected (but disallowed) parallax'
-            printf, priorlun, corrected_plx, sqrt((k*qgaia.e_plx)^2 + sigma_s^2), format='("#parallax",x,f0.5,x,f0.5)'
-            upperlimit = corrected_plx + 3d0*sqrt((k*qgaia.e_plx)^2 + sigma_s^2)
-            if upperlimit gt 1d-3 then begin
-               printf, priorlun, '# Applying a 3-sigma upper limit instead'
-               printf, priorlun, upperlimit, format='("#parallax 0.001 -1 0 ",f0.5)'
-            endif else begin
-               printf, priorlun, '# 3-sigma upper limit is still negative, ignoring parallax'
-            endelse
-         endelse
-      endif      
-
-;      if qgaia.gmag gt -9 and finite(qgaia.e_gmag) and (qgaia.e_gmag lt 1d0) then printf, lun,'Gaia',qgaia.gmag,max([0.02d,qgaia.e_gmag]),qgaia.e_gmag, format=fmt
-;      if qgaia.bpmag gt -9 and finite(qgaia.e_bpmag) and (qgaia.e_bpmag lt 1d0) then printf, lun,'GaiaBP',qgaia.bpmag,max([0.02d,qgaia.e_bpmag]),qgaia.e_bpmag, format=fmt
-;      if qgaia.rpmag gt -9 and finite(qgaia.e_rpmag)  and (qgaia.e_rpmag lt 1d0) then printf, lun,'GaiaRP',qgaia.rpmag,max([0.02d,qgaia.e_rpmag]),qgaia.e_rpmag, format=fmt      
-
-   endif
-endif
 
 ;; DR3 (print BP/RP/G, but leave it commented out)
-;qgaia3=Exofast_Queryvizier('I/350/gaiaedr3',star,dist/60.,/silent,cfa=cfa,/all)
-qgaia3=Exofast_Queryvizier('I/355/gaiadr3',star,dist/60.,/silent,cfa=cfa,/all)
+;qgaia3=queryvizier('I/350/gaiaedr3',star,dist/60.,/silent,cfa=cfa,/all)
+qgaia3=queryvizier('I/355/gaiadr3',star,dist/60.,/silent,cfa=cfa,/all)
 if (size(qgaia3))[2] eq 8 then begin
    match = (where(qgaia3.source eq gaiaid))[0]
    if match ne -1 then begin
@@ -231,15 +193,15 @@ if (size(qgaia3))[2] eq 8 then begin
 
 
       endif      
-;      if qgaia3.gmag gt -9 and finite(qgaia3.e_gmag) and (qgaia3.e_gmag lt 1d0)  then printf, lun,'#Gaia_G_DR3',qgaia3.gmag,max([0.02d,qgaia3.e_gmag]),qgaia3.e_gmag, format=fmt
-;      if qgaia3.bpmag gt -9 and finite(qgaia3.e_bpmag) and (qgaia3.e_bpmag lt 1d0) then printf, lun,'#Gaia_BP_DR3',qgaia3.bpmag,max([0.02d,qgaia3.e_bpmag]),qgaia3.e_bpmag, format=fmt
-;      if qgaia3.rpmag gt -9 and finite(qgaia3.e_rpmag) and (qgaia3.e_rpmag lt 1d0) then printf, lun,'#Gaia_RP_DR3',qgaia3.rpmag,max([0.02d,qgaia3.e_rpmag]),qgaia3.e_rpmag, format=fmt      
+      if qgaia3.gmag gt -9 and finite(qgaia3.e_gmag) and (qgaia3.e_gmag lt 1d0)  then printf, lun,'#Gaia_G_DR3',qgaia3.gmag,max([0.02d,qgaia3.e_gmag]),qgaia3.e_gmag, format=fmt
+      if qgaia3.bpmag gt -9 and finite(qgaia3.e_bpmag) and (qgaia3.e_bpmag lt 1d0) then printf, lun,'#Gaia_BP_DR3',qgaia3.bpmag,max([0.02d,qgaia3.e_bpmag]),qgaia3.e_bpmag, format=fmt
+      if qgaia3.rpmag gt -9 and finite(qgaia3.e_rpmag) and (qgaia3.e_rpmag lt 1d0) then printf, lun,'#Gaia_RP_DR3',qgaia3.rpmag,max([0.02d,qgaia3.e_rpmag]),qgaia3.e_rpmag, format=fmt      
    endif
 endif
 
 ;; use the 2MASS ID to query the 2MASS catalog
 ;tmassid = qtic._2mass
-;q2mass=Exofast_Queryvizier('II/246/out',star,dist/60.,/silent,cfa=cfa)
+;q2mass=queryvizier('II/246/out',star,dist/60.,/silent,cfa=cfa)
 ;if (size(q2mass))[2] eq 8 then begin
 ;   match = (where(q2mass._2mass eq tmassid))[0]
 ;   if match ne -1 then begin
@@ -252,7 +214,7 @@ endif
 
 ;; use the WISE ID to query the wise catalog
 ;wiseid = qtic.wisea
-;qwise=Exofast_Queryvizier('II/328/allwise',star,dist/60.,/silent,cfa=cfa)
+;qwise=queryvizier('II/328/allwise',star,dist/60.,/silent,cfa=cfa)
 ;if (size(qwise))[2] eq 8 then begin
 ;   match = (where(qwise.allwise eq wiseid))[0]
 ;   if match ne -1 then begin
@@ -267,7 +229,7 @@ endif
 ;; use the Tycho ID to query the Stromgren catalog to get a metalicity prior
 if ~finite(feh) or ~finite(ufeh) then begin
    tycid = qtic.tyc
-   qpaunzen15=Exofast_Queryvizier('J/A+A/580/A23/catalog',star,dist/60.,/silent,/all,cfa=cfa)
+   qpaunzen15=queryvizier('J/A+A/580/A23/catalog',star,dist/60.,/silent,/all,cfa=cfa)
    if (size(qpaunzen15))[2] eq 8 then begin
       paunzentycid = string(qpaunzen15.tyc1,qpaunzen15.tyc2,qpaunzen15.tyc3,format='(i04,"-",i05,"-",i01)')
       match = (where(paunzentycid eq tycid))[0]
@@ -308,7 +270,7 @@ if ~finite(feh) or ~finite(ufeh) then begin
  ;           printf, lun, '# Stromgren photometry, Paunzen, 2015'
  ;           printf, lun, '# http://adsabs.harvard.edu/abs/2015A%26A...580A..23P'
             printf, priorlun, '# Cassegrande+ 2011, eq 2'
-            printf, priorlun, feh, ufeh, format='("feh",x,f0.5,x,f0.5)'
+            printf, priorlun, '#', feh, ufeh, format='("feh",x,"#",f0.5,x,f0.5)'
          endif else if b_y gt 0.43d0 and b_y lt 0.63d0 and $
             m1 gt 0.07d0 and m1 le 0.68d0 and $
             c1 gt 0.16d0 and c1 le 0.49d0 then begin
@@ -322,24 +284,59 @@ if ~finite(feh) or ~finite(ufeh) then begin
 ;            printf, lun, '# Stromgren photometry, Paunzen, 2015'
  ;           printf, lun, '# http://adsabs.harvard.edu/abs/2015A%26A...580A..23P' 
             printf, priorlun, '# Cassegrande+ 2011, eq 3'
-            printf, priorlun, feh, ufeh, format='("feh",x,f0.5,x,f0.5)'
+            printf, priorlun,feh, ufeh, format='("feh",x,"#",f0.5,x,f0.5)'
          endif      
          
       endif
    endif
 endif
 
+print, "Querying Abdurro'uf+ (2022) for APOGEE DR17 data...'
+qapo=queryvizier('III/286/allvis',star,dist/60.,/silent,cfa=cfa,/all)
+if n_elements(qapo) gt 1 then begin ; multiple matches. Just take the closest.
+  index = where(qapo[*]._r eq min(qapo[*]._r))
+  qapo = qapo[index]
+endif
+if long(tag_exist(qapo,'VHelio',/quiet)) ne 0L then begin
+  openw, rvlun, rvfile, /get_lun
+  printf, rvlun, "#BJD	VHelio(m/s)	e_RV(m/s)"
+  for i=0, n_elements(index)-1 do begin
+    if qapo[i].VHelio gt -99 and not finite(qapo[i].VHelio,/nan) then begin
+      ra = qapo[i].RAJ2000
+      dec = qapo[i].DEJ2000
+      bjd = utc2bjd(qapo[i].jd, ra, dec, earthobs='apo')
+      printf, rvlun, bjd, qapo[i].VHelio*1000d0, qapo[i].e_RV*1000d0, format='(f, f, f)'
+    endif
+  endfor
+endif else print, "No APOGEE DR17 match."
+
+qapo2=Queryvizier('III/286/catalog',star,dist/60.,/silent,cfa=cfa,/all)
+if n_elements(qapo2) gt 1 then begin ; multiple matches. Just take the closest.
+  index = where(qapo2[*]._r eq min(qapo2[*]._r))
+  qapo2 = qapo2[index]
+endif
+if long(tag_exist(qapo2,'Teff',/quiet)) ne 0L then begin
+  if qapo2.Teff gt 0 and not finite(qapo2.Teff,/nan) then begin
+    printf, priorlun, "### APOGEE DR17 (III/286/catalog) ###"
+    printf, priorlun, 'teff', qapo2.Teff, qapo2.e_teff 
+    printf, priorlun, 'feh', qapo2._FE_H_, qapo2.E__FE_H_ ; or _FE_H_SP?
+  endif
+endif else print, "No APOGEE DR17 match."
+
+print, "Querying Gaia DR3 (I/357/tbosb1, I/360/binmass) RV orbital solution for initial guesses (NOT YET SUPPORTED)..."
+qgaiadr3_rv1 = QueryVizier('I/357/tbosb1', star, dist/60., /silent, cfa=cfa, /all)
+qgaiadr3_rv2 = Queryvizier('I/360/binmass', star, dist/60., /silent, cfa=cfa, /all)
 ;; we can do better than -5 < [Fe/H]_0 < +0.5
-if ~finite(feh) or ~finite(ufeh) then begin
+;if ~finite(feh) or ~finite(ufeh) then begin
 ;   printf, priorlun, '# Cassegrande+ 2011, Table 1'
 ;   feh = -0.06d0
 ;   ufeh = 0.25d0
 
-   printf, priorlun, '# wide Gaussian prior'
-   feh = 0d0
-   ufeh = 1d0
-   printf, priorlun, feh,ufeh, format='("feh",x,f0.5,x,f0.5)'
-endif
+;   printf, priorlun, '# wide Gaussian prior'
+;   feh = 0d0
+;;   ufeh = 1d0
+;   printf, priorlun, feh, ufeh, format='("feh",x,"#",f0.5,x,f0.5)'
+;endif
 
 free_lun, priorlun
 ;free_lun, lun
