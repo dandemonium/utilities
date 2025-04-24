@@ -104,8 +104,8 @@ if n_elements(qgalex) gt 1 then begin ; multiple matches. Just take the closest.
 endif
 if long(tag_exist(qgalex,'fuv_6',/quiet)) ne 0L then begin
   printf, sedlun, '# GALEX GR6+7 (Bianchi+2017; II/335/galex_ais)' 
-  if qgalex.fuv_6 gt -99 and not finite(qgalex.e_fuv_6,/nan) then printf,sedlun,'GALEX_GALEX.FUV',qgalex.fuv_6+18.82-2.223,max([0.1,qgalex.e_fuv_6],/nan),qgalex.e_fuv_6 
-  if qgalex.nuv_6 gt -99 and not finite(qgalex.e_nuv_6,/nan) then printf,sedlun,'GALEX_GALEX.NUV',qgalex.nuv_6+20.08-1.699,max([0.1,qgalex.e_nuv_6],/nan),qgalex.e_nuv_6
+  if qgalex.fuv gt -99 and not finite(qgalex.e_fuv,/nan) then printf,sedlun,'GALEX_GALEX.FUV',qgalex.fuv,max([0.1,qgalex.e_fuv],/nan),qgalex.e_fuv
+  if qgalex.nuv gt -99 and not finite(qgalex.e_nuv,/nan) then printf,sedlun,'GALEX_GALEX.NUV',qgalex.nuv,max([0.1,qgalex.e_nuv],/nan),qgalex.e_nuv
 endif else print, "No GALEX match."
 
 ; get Mermilliod 1991 UBV
