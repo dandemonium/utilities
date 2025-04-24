@@ -29,7 +29,6 @@ if n_elements(gaiaspfile) eq 0 then gaiaspfile = star + '.gaia.sed'
 if keyword_set(france) then cfa = 0B else cfa = 1B
 
 if keyword_set(sedfile) then openw, sedlun, sedfile, /get_lun
-if ~keyword_set(rvfile) then rvfile='_'+string(ticid)+'.apogee.dr17.rv'
 ; query TIC v8.2 by RA and Dec (if specified) or star name)
 if n_elements(ra) ne 0 and n_elements(dec) ne 0 then begin
    print, 'WARNING: querying by RA/Dec is less robust than querying by catalog name (TIC ID) and may lead to misidentification'   
@@ -58,7 +57,7 @@ endif else begin
       endif
    endif
 endelse
-
+if ~keyword_set(rvfile) then rvfile='_'+string(ticid)+'.apogee.dr17.rv'
 ;; Gaia spectrophotometry
 if keyword_set(gaiaspfile) then begin
    qgaiasp=Exofast_Queryvizier('I/355/xpsample',star,dist/60.,/silent,cfa=cfa,/all)
@@ -86,16 +85,27 @@ if keyword_set(gaiaonly) then begin
 endif
 
 ; get GALEX
-print, 'Querying Bianchi+ (2011) for GALEX DR5 FUV and NUV...'
-qgalex=QueryVizier('II/312/ais',star,dist/60.,/silent,/all,cfa=cfa)
+;print, 'Querying Bianchi+ (2011) for GALEX DR5 FUV and NUV...'
+;qgalex=QueryVizier('II/312/ais',star,dist/60.,/silent,/all,cfa=cfa)
+;if n_elements(qgalex) gt 1 then begin ; multiple matches. Just take the closest.
+;  index = where(qgalex[*]._r eq min(qgalex[*]._r))
+;  qgalex = qgalex[index]
+;endif
+;if long(tag_exist(qgalex,'fuv_6',/quiet)) ne 0L then begin
+;  printf, sedlun, '# GALEX DR5 (Bianchi+2011; II/312/ais)' 
+;  if qgalex.fuv_6 gt -99 and not finite(qgalex.e_fuv_6,/nan) then printf,sedlun,'GALEX_GALEX.FUV',qgalex.fuv_6+18.82-0.07,max([0.1,qgalex.e_fuv_6],/nan),qgalex.e_fuv_6 
+;  if qgalex.nuv_6 gt -99 and not finite(qgalex.e_nuv_6,/nan) then printf,sedlun,'GALEX_GALEX.NUV',qgalex.nuv_6+20.08-0.07,max([0.1,qgalex.e_nuv_6],/nan),qgalex.e_nuv_6
+;endif else print, "No GALEX match."
+print, 'Querying Bianchi+ (2017; II/335/galex_ais) for GALEX GR7 FUV and NUV...'
+qgalex=QueryVizier('II/335/galex_ais',star,dist/60.,/silent,/all,cfa=cfa)
 if n_elements(qgalex) gt 1 then begin ; multiple matches. Just take the closest.
   index = where(qgalex[*]._r eq min(qgalex[*]._r))
   qgalex = qgalex[index]
 endif
 if long(tag_exist(qgalex,'fuv_6',/quiet)) ne 0L then begin
-  printf, sedlun, '# GALEX DR5 (Bianchi+2011; II/312/ais)' 
-  if qgalex.fuv_6 gt -99 and not finite(qgalex.e_fuv_6,/nan) then printf,sedlun,'GALEX_GALEX.FUV',qgalex.fuv_6+18.82-0.07,max([0.1,qgalex.e_fuv_6],/nan),qgalex.e_fuv_6 
-  if qgalex.nuv_6 gt -99 and not finite(qgalex.e_nuv_6,/nan) then printf,sedlun,'GALEX_GALEX.NUV',qgalex.nuv_6+20.08-0.07,max([0.1,qgalex.e_nuv_6],/nan),qgalex.e_nuv_6
+  printf, sedlun, '# GALEX GR6+7 (Bianchi+2017; II/335/galex_ais)' 
+  if qgalex.fuv_6 gt -99 and not finite(qgalex.e_fuv_6,/nan) then printf,sedlun,'GALEX_GALEX.FUV',qgalex.fuv_6+18.82-2.223,max([0.1,qgalex.e_fuv_6],/nan),qgalex.e_fuv_6 
+  if qgalex.nuv_6 gt -99 and not finite(qgalex.e_nuv_6,/nan) then printf,sedlun,'GALEX_GALEX.NUV',qgalex.nuv_6+20.08-1.699,max([0.1,qgalex.e_nuv_6],/nan),qgalex.e_nuv_6
 endif else print, "No GALEX match."
 
 ; get Mermilliod 1991 UBV
