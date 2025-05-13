@@ -130,7 +130,7 @@ endif
 print, ''
 
 if n_elements(ticid) eq 0 then message, 'TICID is required'
-if n_elements(priorfile) eq 0 then priorfile = stinng(ticid) + '.priors'
+if n_elements(priorfile) eq 0 then priorfile = string(ticid) + '.priors'
 if n_elements(sedfile) eq 0 then sedfile = string(ticid) + '.sed'
 if n_elements(gaiaspfile) eq 0 then gaiaspfile = string(ticid) + '.Gaia.sed'
 if n_elements(rvfile) eq 0 then rvfile = string(ticid) + '.APOGEE-2.DR17.rv'
