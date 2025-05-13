@@ -126,6 +126,7 @@ if n_elements(ra) ne 0 and n_elements(dec) ne 0 then begin
    ticid = qtic[ndx].tic
    print, 'Matching TIC ID is ' + strtrim(ticid,2)
 endif
+
 print, ''
 
 if n_elements(ticid) eq 0 then message, 'TICID is required'
@@ -174,14 +175,6 @@ endif else begin
 
    ticid = strtrim(qtic.tic,2)
    print, 'Matching TIC ID is ' + strtrim(ticid,2)
-   print, 'Querying TIC v8.2 (Paegert+2021) for TESS Tmag for SED+TESS eclipse-constrained Teffs...'
-   if qtic.tmag gt -9 and finite(qtic.tmag) and (qtic.e_tmag lt 1d0) then begin
-      printf, lun, '# TIC v8.2 Paegert+(2021; IV/39/tic82)' 
-      printf, lun, '# Uncomment to trigger SED-derived TESS sec. eclipse depths'
-      printf, lun, '# (magnitude measurement is not used to constrain SED fit).'    
-      comment = '#       '
-      printf, lun, comment+'TESS_TESS.Red',qtic.tmag, qtic.e_tmag, qtic.e_tmag, format=fmt
-   endif
 endelse
 
 if (size(qtic))[2] ne 8 then begin
@@ -209,6 +202,15 @@ endif
 
 qtic = qtic[match]
 star = [qtic.raj2000,qtic.dej2000]
+
+print, 'Querying TIC v8.2 (Paegert+2021) for TESS Tmag for SED+TESS eclipse-constrained Teffs...'
+if qtic.tmag gt -9 and finite(qtic.tmag) and (qtic.e_tmag lt 1d0) then begin
+   printf, lun, '# TIC v8.2 Paegert+(2021; IV/39/tic82)' 
+   printf, lun, '# Uncomment to trigger SED-derived TESS sec. eclipse depths'
+   printf, lun, '# (magnitude measurement is not used to constrain SED fit).'    
+   comment = '#       '
+   printf, lun, comment+'TESS_TESS.Red',qtic.tmag, qtic.e_tmag, qtic.e_tmag, format=fmt
+endif
 
 if finite(qtic.mass) and finite(qtic.rad) and finite(qtic.teff) then begin
    ;; require all three. starting hybrid
