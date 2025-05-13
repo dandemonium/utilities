@@ -130,10 +130,10 @@ endif
 print, ''
 
 if n_elements(ticid) eq 0 then message, 'TICID is required'
-if n_elements(priorfile) eq 0 then priorfile = ticid + '.priors'
-if n_elements(sedfile) eq 0 then sedfile = ticid + '.sed'
-if n_elements(gaiaspfile) eq 0 then gaiaspfile = ticid + '.Gaia.sed'
-if n_elements(rvfile) eq 0 then rvfile = ticid + '.APOGEE-2.DR17.rv'
+if n_elements(priorfile) eq 0 then priorfile = stinng(ticid) + '.priors'
+if n_elements(sedfile) eq 0 then sedfile = string(ticid) + '.sed'
+if n_elements(gaiaspfile) eq 0 then gaiaspfile = string(ticid) + '.Gaia.sed'
+if n_elements(rvfile) eq 0 then rvfile = string(ticid) + '.APOGEE-2.DR17.rv'
 if ~keyword_set(galex7) and ~keyword_set(galex5) then begin ; by default, get GALEX GR6+7 over GR5
    galex5 = 0B
    galex7 = 1B 
