@@ -195,8 +195,9 @@ endif else begin
    match = where(qtic.gaia eq gaiaid)
    if match[0] eq -1 then message, 'no matching star found. try using the TIC ID directly'
    qtic = qtic[match]
-   ra = qtic[match].RAJ2000
-   dec = qtic[match].DEJ2000
+   ra = qgaia[match].RAJ2000
+   dec = qgaia[match].DEJ2000
+   star = [ra,dec]
    ticid = strtrim(qtic.tic,2)
    print, 'Matching TIC ID is ' + strtrim(ticid,2)
 endelse
@@ -225,7 +226,7 @@ if qtic[match].disp eq 'SPLIT' or qtic[match].disp eq 'DUPLICATE' then begin
 endif
 
 qtic = qtic[match]
-star = [qtic.raj2000,qtic.dej2000]
+if ~keyword_set(star) then star = [qtic.raj2000,qtic.dej2000]
 
 print, 'Querying TIC v8.2 (Paegert+2021) for TESS Tmag for SED+TESS eclipse-constrained Teffs...'
 if qtic.tmag gt -9 and finite(qtic.tmag) and (qtic.e_tmag lt 1d0) then begin
@@ -811,6 +812,7 @@ endif
 if long(tag_exist(qapo,'VHelio',/quiet)) ne 0L then begin
   openw, rvlun, rvfile, /get_lun
   printf, rvlun, "#BJD	VHelio(m/s)	e_RV(m/s)"
+  stop
   for i=0, n_elements(index)-1 do begin
     if qapo[i].VHelio gt -99 and not finite(qapo[i].VHelio,/nan) then begin
       ra = qapo[i].RAJ2000
