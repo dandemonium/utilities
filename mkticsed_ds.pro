@@ -37,6 +37,27 @@ end
 
 ;+
 ; NAME:
+;   CROSSREF
+; PURPOSE:
+;     Finds the closest match to refra and refdec from an array of RAs
+;     and Decs.
+; Modification 
+;    2018-04-12: Jason Eastman, CfA
+;                Renamed, documented, and cleaned up for distribution with EXOFASTv2
+;
+;-
+function crossref, refra, refdec, raarr, decarr
+
+sep = angsep(refra*!dpi/180d0+dblarr(n_elements(raarr)),$
+             refdec*!dpi/180d0+dblarr(n_elements(raarr)),$
+             raarr*!dpi/180d0,decarr*!dpi/180d0)
+junk = min(sep,match)
+return, match
+
+end
+
+;+
+; NAME:
 ;   MKTICSED
 ;
 ; PURPOSE: 
@@ -174,7 +195,8 @@ endif else begin
    match = where(qtic.gaia eq gaiaid)
    if match[0] eq -1 then message, 'no matching star found. try using the TIC ID directly'
    qtic = qtic[match]
-
+   ra = qtic[match].RAJ2000
+   dec = qtic[match].DEJ2000
    ticid = strtrim(qtic.tic,2)
    print, 'Matching TIC ID is ' + strtrim(ticid,2)
 endelse
