@@ -812,7 +812,6 @@ endif
 if long(tag_exist(qapo,'VHelio',/quiet)) ne 0L then begin
   openw, rvlun, rvfile, /get_lun
   printf, rvlun, "#BJD	VHelio(m/s)	e_RV(m/s)"
-  stop
   for i=0, n_elements(index)-1 do begin
     if qapo[i].VHelio gt -99 and not finite(qapo[i].VHelio,/nan) then begin
       ra = qapo[i].RAJ2000
