@@ -753,7 +753,7 @@ if long(tag_exist(qkis,'KIS',/quiet)) ne 0L then begin
    
    if keyword_set(kepler) then comment = '' else comment = '#      '
    
-   if qkis.umag gt -9 and finite(qkis.e_umag) then printf, lun,comment+'INT_WFC.RGO_U',qkis.umag,max([0.02d,qkis.e_umag]),qkis.e_umag, format=fmt
+   if qkis.umag gt -9 and finite(qkis.e_umag) then printf, lun,comment+'INT_WFC.RGO_u',qkis.umag,max([0.02d,qkis.e_umag]),qkis.e_umag, format=fmt
    if qkis.gmag gt -9 and finite(qkis.e_gmag) then printf, lun,comment+' INT_WFC.Gunn_g',qkis.gmag,max([0.02d,qkis.e_gmag]),qkis.e_gmag, format=fmt
    if qkis.rmag gt -9 and finite(qkis.e_rmag) then printf, lun,comment+' INT_WFC.Gunn_r',qkis.rmag,max([0.02d,qkis.e_rmag]),qkis.e_rmag, format=fmt
    if qkis.imag gt -9 and finite(qkis.e_imag) then printf, lun,comment+' INT_WFC.Gunn_i',qkis.imag,max([0.02d,qkis.e_imag]),qkis.e_imag, format=fmt
