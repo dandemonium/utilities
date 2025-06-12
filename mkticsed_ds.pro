@@ -169,7 +169,7 @@ openw, priorlun, priorfile, /get_lun
 printf, priorlun, '#### TICv8.2 ####'
 
 ;; open the SED file for writing
-fmt = '(a21,x,f9.6,x,f0.6,x,f0.6)'
+fmt = '(a22,x,f9.6,x,f0.6,x,f0.6)'
 openw, lun, sedfile, /get_lun
 printf, lun, '# band_name magnitude used_errors catalog_errors stars'
 
