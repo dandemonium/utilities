@@ -181,7 +181,10 @@ endif else begin
    print, 'WARNING: querying by name is less robust than querying by TIC ID and may lead to misidentification'
    qtic = Exofast_Queryvizier('IV/39/tic82',ticid,2d0,/allcolumns,cfa=cfa)
    qgaia = Exofast_Queryvizier('I/355/gaiadr3',ticid,2d0,/allcolumns,cfa=cfa)   
-
+   ticndx = where(qtic.tic eq ticid)
+   qtic = qtic[ticndx]
+   ra = qtic.raj2000
+   dec = qtic.dej2000
    if (size(qgaia))[2] ne 8 then begin
       message, 'no matching star found. try using the TIC ID directly'
    endif
