@@ -169,7 +169,7 @@ openw, priorlun, priorfile, /get_lun
 printf, priorlun, '#### TICv8.2 ####'
 
 ;; open the SED file for writing
-fmt = '(a22,x,f9.6,x,f0.6,x,f0.6)'
+fmt = '(a21,x,f9.6,x,f0.6,x,f0.6)'
 openw, lun, sedfile, /get_lun
 printf, lun, '# band_name magnitude used_errors catalog_errors stars'
 
@@ -179,13 +179,9 @@ if strtrim(long(ticid),2) eq ticid then begin
 endif else begin
    ;; query by supplied name (less robust)
    print, 'WARNING: querying by name is less robust than querying by TIC ID and may lead to misidentification'
-   print, ticid
    qtic = Exofast_Queryvizier('IV/39/tic82',ticid,2d0,/allcolumns,cfa=cfa)
-   qgaia = Exofast_Queryvizier('I/355/gaiadr3',ticid,2d0,/allcolumns,cfa=cfa)   
-   ticndx = where(qtic.tic eq ticid)
-   qtic = qtic[ticndx]
-   ra = qtic.raj2000
-   dec = qtic.dej2000
+   qgaia = Exofast_Queryvizier('I/345/gaia2',ticid,2d0,/allcolumns,cfa=cfa)   
+
    if (size(qgaia))[2] ne 8 then begin
       message, 'no matching star found. try using the TIC ID directly'
    endif
@@ -232,14 +228,14 @@ endif
 qtic = qtic[match]
 if ~keyword_set(star) then star = [qtic.raj2000,qtic.dej2000]
 
-;print, 'Querying TIC v8.2 (Paegert+2021) for TESS Tmag for SED+TESS eclipse-constrained Teffs...'
-;if qtic.tmag gt -9 and finite(qtic.tmag) and (qtic.e_tmag lt 1d0) then begin
-;   printf, lun, '# TIC v8.2 Paegert+(2021; IV/39/tic82)' 
-;   printf, lun, '# Uncomment to trigger SED-derived TESS sec. eclipse depths'
-;   printf, lun, '# (magnitude measurement is not used to constrain SED fit).'    
-;   comment = '#       '
-;   printf, lun, comment+'TESS_TESS.Red',qtic.tmag, qtic.e_tmag, qtic.e_tmag, format=fmt
-;endif
+print, 'Querying TIC v8.2 (Paegert+2021) for TESS Tmag for SED+TESS eclipse-constrained Teffs...'
+if qtic.tmag gt -9 and finite(qtic.tmag) and (qtic.e_tmag lt 1d0) then begin
+   printf, lun, '# TIC v8.2 Paegert+(2021; IV/39/tic82)' 
+   printf, lun, '# Uncomment to trigger SED-derived TESS sec. eclipse depths'
+   printf, lun, '# (magnitude measurement is not used to constrain SED fit).'    
+   comment = '#       '
+   printf, lun, comment+'TESS_TESS.Red',qtic.tmag, qtic.e_tmag, qtic.e_tmag, format=fmt
+endif
 
 if finite(qtic.mass) and finite(qtic.rad) and finite(qtic.teff) then begin
    ;; require all three. starting hybrid
@@ -325,7 +321,7 @@ if (size(qgaia))[2] eq 8 then begin
             sigma_s = 0.043d0
          endelse
          printf, priorlun, '#### Gaia DR2 ####'
-         printf, priorlun, '#   NOTE: Gaia DR2 parallax (" + strtrim(qgaia.plx,2) + ") and error (" + strtrim(qgaia.e_plx,2) + ") have been corrected as prescribed in Lindegren+ (2018)."
+         printf, priorlun, "#   NOTE: Gaia DR2 parallax (" + strtrim(qgaia.plx,2) + ") and error (" + strtrim(qgaia.e_plx,2) + ") have been corrected as prescribed in Lindegren+ (2018)."
          corrected_plx = qgaia.plx + 0.030d0
          if corrected_plx gt 0d0 then begin
             dr2str = string(corrected_plx, sqrt((k*qgaia.e_plx)^2 + sigma_s^2), format='("parallax",x,f0.5,x,f0.5)')
@@ -350,9 +346,10 @@ print, ''
 ;; DR3
 qgaia3=Exofast_Queryvizier('I/355/gaiadr3',star,dist/60.,/silent,cfa=cfa,/all)
 if (size(qgaia3))[2] eq 8 then begin
-   match = (where(qgaia3.source eq gaiaid))[0]
+   match = where(qgaia3.gmag eq max(qgaia3.gmag))
    if match ne -1 then begin
       qgaia3 = qgaia3[match]
+      gaiaid = qgaia3.dr3name
       printf, priorlun, '#### Gaia DR3 ####'
       printf, priorlun, "#   Note: RUWE = " + strtrim(qgaia3.ruwe,2) + " is the renormalized"
       printf, priorlun, "#         sqrt(chi^2/dof) of the astrometric fit. 
@@ -382,22 +379,20 @@ if (size(qgaia3))[2] eq 8 then begin
             zpt = get_zpt(phot_g_mean_mag, nu_eff_used_in_astrometry, pseudocolor, ecl_lat, astrometric_params_solved)
             printf, priorlun, "#   NOTE: the Gaia DR3 parallax (" + strtrim(qgaia3.plx,2) + ") has been corrected by subtracting " + strtrim(zpt,2) + " mas as prescribed in Lindegren+(2021)."
             ;printf, priorlun, "# NOTE: the Gaia DR3 parallax uncertainty (" + strtrim(qgaia3.e_plx,2) + ") has been added in quadrature with 0.01 to account for remaining systematic residuals"
-            printf, priorlun, qgaia3.plx-zpt, uplx, format='("parallax",x,f0.5,x,f0.5)' 
-            printf, priorlun, "distance_0 ", strtrim(1000d0/(qgaia3.plx-zpt),2)        
+            printf, priorlun, qgaia3.plx-zpt, uplx, format='("parallax",x,f0.5,x,f0.5)'            
          endif else begin
             printf, priorlun, "#   NOTE: the Gaia DR3 parallax could not be corrected and is raw from the catalog."
             printf, priorlun, qgaia3.plx, uplx, format='("parallax",x,f0.5,x,f0.5)'
-            printf, priorlun, "distance_0 ", strtrim(1000d0/qgaia3.plx,2)
          endelse
       endif else if dr2str ne '' then begin
          printf, priorlun, "#   DR3 parallax unavailable. Using DR2 parallax"
          printf, priorlun, dr2str
       endif
       comment = '#        '
-      if qgaia3.gmag gt -9 and finite(qgaia3.e_gmag) and (qgaia3.e_gmag lt 1d0)  then printf, lun, '#', 'GAIA_GAIA3.G', qgaia3.gmag, max([0.02d,qgaia3.e_gmag]), qgaia3.e_gmag;,  format=fmt
+      if qgaia3.gmag gt -9 and finite(qgaia3.e_gmag) and (qgaia3.e_gmag lt 1d0)  then printf, lun, comment + 'GAIA_GAIA3.G', qgaia3.gmag, max([0.02d,qgaia3.e_gmag]), qgaia3.e_gmag,  format=fmt
       comment = '#      '
-      if qgaia3.bpmag gt -9 and finite(qgaia3.e_bpmag) and (qgaia3.e_bpmag lt 1d0) then printf, lun, '#', 'GAIA_GAIA3.Gbp', qgaia3.bpmag, max([0.02d,qgaia3.e_bpmag]), qgaia3.e_bpmag;,  format=fmt
-      if qgaia3.rpmag gt -9 and finite(qgaia3.e_rpmag) and (qgaia3.e_rpmag lt 1d0) then printf, lun, '#','GAIA_GAIA3.Grp', qgaia3.rpmag, max([0.02d,qgaia3.e_rpmag]), qgaia3.e_rpmag;,  format=fmt      
+      if qgaia3.bpmag gt -9 and finite(qgaia3.e_bpmag) and (qgaia3.e_bpmag lt 1d0) then printf, lun, comment + 'GAIA_GAIA3.Gbp', qgaia3.bpmag, max([0.02d,qgaia3.e_bpmag]), qgaia3.e_bpmag,  format=fmt
+      if qgaia3.rpmag gt -9 and finite(qgaia3.e_rpmag) and (qgaia3.e_rpmag lt 1d0) then printf, lun, comment + 'GAIA_GAIA3.Grp', qgaia3.rpmag, max([0.02d,qgaia3.e_rpmag]), qgaia3.e_rpmag,  format=fmt      
    endif else if dr2str ne '' then begin
       printf, priorlun, "# DR3 parallax unavailable. Using DR2 parallax"
       printf, priorlun, dr2str
@@ -414,7 +409,7 @@ print, ''
 print, "Querying Gaia DR3 (I/355/xpsample) for BP/RP spectrophotometry..."
 qgaiasp=Exofast_Queryvizier('I/355/xpsample',star,dist/60.,/silent,cfa=cfa,/all)
 if (size(qgaiasp))[2] eq 8 then begin
-   match = where(qgaiasp.source eq gaiaid)
+   match = where(qgaiasp.source eq qgaia3.source)
    if match[0] ne -1 then begin
       ;; Gaia lambda in nm, Gaia flux in W/m^2/Hz
       ;; SED plot in microns, erg/s/cm^2
@@ -432,6 +427,55 @@ print, ''
 print, "Querying Gaia DR3 (I/357/tbosb1, I/360/binmass) RV orbital solution for initial guesses (NOT YET SUPPORTED)..."
 qgaiadr3_rv1 = QueryVizier('I/357/tbosb1', star, dist/60., /silent, cfa=cfa, /all)
 qgaiadr3_rv2 = Queryvizier('I/360/binmass', star, dist/60., /silent, cfa=cfa, /all)
+
+print, ''
+
+;; use the 2MASS ID to query the 2MASS catalog
+print, 'Querying Cutri+ (2003) 2MASS catalog for JHK...'
+tmassid = qtic._2mass
+q2mass=Exofast_Queryvizier('II/246/out',star,dist/60.,/silent,cfa=cfa)
+if (size(q2mass))[2] eq 8 then begin
+   match = (where(q2mass._2mass eq tmassid))[0]
+   if match ne -1 then begin
+      q2mass = q2mass[match]
+      if q2mass.Jmag gt -9 and (q2mass.e_Jmag lt 1d0) then printf, lun,'2MASS_2MASS.J',q2mass.Jmag,max([0.02d,q2mass.e_Jmag]),q2mass.e_Jmag, format=fmt
+      if q2mass.Hmag gt -9 and (q2mass.e_Hmag lt 1d0) then printf, lun,'2MASS_2MASS.H',q2mass.Hmag,max([0.02d,q2mass.e_Hmag]),q2mass.e_Hmag, format=fmt
+      if q2mass.Kmag gt -9 and (q2mass.e_Kmag lt 1d0) then begin
+         printf, lun,'2MASS_2MASS.Ks',q2mass.Kmag,max([0.02d,q2mass.e_Kmag]),q2mass.e_Kmag, format=fmt
+         ;printf, priorlun,'# Apparent 2MASS K magnitude for the Mann relation'
+         ;printf, priorlun,'appks',q2mass.Kmag,max([0.02d,q2mass.e_Kmag]), format='(a5,x,f9.6,x,f0.6)'
+      endif
+   endif
+endif
+
+print, ''
+
+;; use the WISE ID to query the wise catalog
+print, 'Querying AllWISE (Cutri+2013; II/328/allwise) for IR WISE1-4...'
+wiseid = qtic.wisea
+qwise=Exofast_Queryvizier('II/328/allwise',star,dist/60.,/silent,cfa=cfa)
+if (size(qwise))[2] eq 8 then begin
+   match = (where(qwise.allwise eq wiseid))[0]
+   if match ne -1 then begin
+      qwise = qwise[match]
+      if qwise.w1mag gt -9 and finite(qwise.e_w1mag) and (qwise.e_w1mag lt 1d0) then printf, lun,'WISE_WISE.W1',qwise.w1mag,max([0.03d,qwise.e_w1mag]),qwise.e_w1mag, format=fmt
+      if qwise.w2mag gt -9 and finite(qwise.e_w2mag) and (qwise.e_w2mag lt 1d0) then printf, lun,'WISE_WISE.W2',qwise.w2mag,max([0.03d,qwise.e_w2mag]),qwise.e_w2mag, format=fmt
+      if qwise.w3mag gt -9 and finite(qwise.e_w3mag) and (qwise.e_w3mag lt 1d0) then printf, lun,'WISE_WISE.W3',qwise.w3mag,max([0.03d,qwise.e_w3mag]),qwise.e_w3mag, format=fmt
+      if qwise.w4mag gt -9 and finite(qwise.e_w4mag) and (qwise.e_w4mag lt 1d0) then printf, lun,'WISE_WISE.W4',qwise.w4mag,max([0.10d,qwise.e_w4mag]),qwise.e_w4mag, format=fmt
+   endif else begin
+      print, 'No match in WISE by ID in TICv8.2'
+      mindmag = min(abs(q2mass.Kmag-qwise.w1mag),match)
+      sep = angsep(qtic.raj2000*!dpi/180d0,qtic.dej2000*!dpi/180d0,qwise.raj2000*!dpi/180d0, qwise.dej2000*!dpi/180d0)*180d0/!dpi*3600d0 ;; arcsec
+      if mindmag lt 0.5 and sep[match] lt 30d0 then begin
+         qwise = qwise[match]
+         printf, lun, '# No match in WISE by ID in TICv8.2, matched by K-WISE1 mag (' + strtrim(mindmag,2) + ') and separation (' + strtrim(sep[match],2) + '")'
+         if qwise.w1mag gt -9 and finite(qwise.e_w1mag) and (qwise.e_w1mag lt 1d0) then printf, lun,'WISE_WISE.W1',qwise.w1mag,max([0.03d,qwise.e_w1mag]),qwise.e_w1mag, format=fmt
+         if qwise.w2mag gt -9 and finite(qwise.e_w2mag) and (qwise.e_w2mag lt 1d0) then printf, lun,'WISE_WISE.W2',qwise.w2mag,max([0.03d,qwise.e_w2mag]),qwise.e_w2mag, format=fmt
+         if qwise.w3mag gt -9 and finite(qwise.e_w3mag) and (qwise.e_w3mag lt 1d0) then printf, lun,'WISE_WISE.W3',qwise.w3mag,max([0.03d,qwise.e_w3mag]),qwise.e_w3mag, format=fmt
+         if qwise.w4mag gt -9 and finite(qwise.e_w4mag) and (qwise.e_w4mag lt 1d0) then printf, lun,'WISE_WISE.W4',qwise.w4mag,max([0.10d,qwise.e_w4mag]),qwise.e_w4mag, format=fmt
+      endif
+   endelse
+endif
 
 print, ''
 
@@ -541,8 +585,8 @@ print, 'Querying Bianchi+ (2017; II/335/galex_ais) for GALEX GR7 FUV and NUV...'
 qgalex=QueryVizier('II/335/galex_ais',star,galdist/60d0,/silent,/all,cfa=cfa)
 if long(tag_exist(qgalex,'fuvmag',/quiet)) ne 0L then begin
    printf, lun, '# GALEX GR6+7 (Bianchi+2017; II/335/galex_ais):'
-   print, 'Note: Atmospheric models are generally untrustworthy in the UV. Including UV photometry may bias the fit.'
-   print, 'Matching is done by nearest neighbor with ~10% failure rate.'
+   printf, lun, '# Note: Atmospheric models are generally untrustworthy in the UV. Including UV photometry may bias the fit.'
+   printf, lun, '# Matching is done by nearest neighbor with ~10% failure rate.'
    if n_elements(qgalex) gt 1 then begin
       print,'Warning: More than 1 GALEX source found; using nearest one only.'
       printf, lun,'# Warning: More than 1 GALEX source found; using nearest one only.'
@@ -574,8 +618,8 @@ qtyc2=Exofast_Queryvizier('I/259/TYC2',star,dist/60.,/silent,/all,cfa=cfa)
 if long(tag_exist(qtyc2,'BTMAG',/quiet)) ne 0L then begin
    printf, lun, '# Tycho catalog, Hog+ (2000; I/259/TYC2)'
 ;   printf, lun, '# https://adsabs.harvard.edu/abs/2000A%26A...355L..27H'
-   print, 'Matching is done by nearest neighbor with ~10% failure rate.'
-   print, 'Note: Labels are for Mann & von Braun (2015) passband.'
+   printf, lun, '# Matching is done by nearest neighbor with ~10% failure rate.'
+   printf, lun, '# Note: Labels are for Mann & von Braun (2015) passband.'
    if n_elements(qtyc2) gt 1 then begin
       print,'Warning: More than 1 Tycho-2 source found; using nearest one only.'
       printf, lun,'# Warning: More than 1 Tycho-2 source found; using nearest one only.'
@@ -707,7 +751,7 @@ if long(tag_exist(qkis,'KIS',/quiet)) ne 0L then begin
    
    if keyword_set(kepler) then comment = '' else comment = '#      '
    
-   if qkis.umag gt -9 and finite(qkis.e_umag) then printf, lun,comment+'INT_WFC.RGO_u',qkis.umag,max([0.02d,qkis.e_umag]),qkis.e_umag, format=fmt
+   if qkis.umag gt -9 and finite(qkis.e_umag) then printf, lun,comment+'INT_WFC.RGO_U',qkis.umag,max([0.02d,qkis.e_umag]),qkis.e_umag, format=fmt
    if qkis.gmag gt -9 and finite(qkis.e_gmag) then printf, lun,comment+' INT_WFC.Gunn_g',qkis.gmag,max([0.02d,qkis.e_gmag]),qkis.e_gmag, format=fmt
    if qkis.rmag gt -9 and finite(qkis.e_rmag) then printf, lun,comment+' INT_WFC.Gunn_r',qkis.rmag,max([0.02d,qkis.e_rmag]),qkis.e_rmag, format=fmt
    if qkis.imag gt -9 and finite(qkis.e_imag) then printf, lun,comment+' INT_WFC.Gunn_i',qkis.imag,max([0.02d,qkis.e_imag]),qkis.e_imag, format=fmt
@@ -717,57 +761,6 @@ endif else begin
 endelse
 
 print, ''
-
-
-;; use the 2MASS ID to query the 2MASS catalog
-print, 'Querying Cutri+ (2003) 2MASS catalog for JHK...'
-tmassid = qtic._2mass
-q2mass=Exofast_Queryvizier('II/246/out',star,dist/60.,/silent,cfa=cfa)
-if (size(q2mass))[2] eq 8 then begin
-   match = (where(q2mass._2mass eq tmassid))[0]
-   if match ne -1 then begin
-      q2mass = q2mass[match]
-      if q2mass.Jmag gt -9 and (q2mass.e_Jmag lt 1d0) then printf, lun,'2MASS_2MASS.J',q2mass.Jmag,max([0.02d,q2mass.e_Jmag]),q2mass.e_Jmag, format=fmt
-      if q2mass.Hmag gt -9 and (q2mass.e_Hmag lt 1d0) then printf, lun,'2MASS_2MASS.H',q2mass.Hmag,max([0.02d,q2mass.e_Hmag]),q2mass.e_Hmag, format=fmt
-      if q2mass.Kmag gt -9 and (q2mass.e_Kmag lt 1d0) then begin
-         printf, lun,'2MASS_2MASS.Ks',q2mass.Kmag,max([0.02d,q2mass.e_Kmag]),q2mass.e_Kmag, format=fmt
-         ;printf, priorlun,'# Apparent 2MASS K magnitude for the Mann relation'
-         ;printf, priorlun,'appks',q2mass.Kmag,max([0.02d,q2mass.e_Kmag]), format='(a5,x,f9.6,x,f0.6)'
-      endif
-   endif
-endif
-
-print, ''
-
-;; use the WISE ID to query the wise catalog
-print, 'Querying AllWISE (Cutri+2013; II/328/allwise) for IR WISE1-4...'
-wiseid = qtic.wisea
-qwise=Exofast_Queryvizier('II/328/allwise',star,dist/60.,/silent,cfa=cfa)
-if (size(qwise))[2] eq 8 then begin
-   match = (where(qwise.allwise eq wiseid))[0]
-   if match ne -1 then begin
-      qwise = qwise[match]
-      if qwise.w1mag gt -9 and finite(qwise.e_w1mag) and (qwise.e_w1mag lt 1d0) then printf, lun,'WISE_WISE.W1',qwise.w1mag,max([0.03d,qwise.e_w1mag]),qwise.e_w1mag, format=fmt
-      if qwise.w2mag gt -9 and finite(qwise.e_w2mag) and (qwise.e_w2mag lt 1d0) then printf, lun,'WISE_WISE.W2',qwise.w2mag,max([0.03d,qwise.e_w2mag]),qwise.e_w2mag, format=fmt
-      if qwise.w3mag gt -9 and finite(qwise.e_w3mag) and (qwise.e_w3mag lt 1d0) then printf, lun,'WISE_WISE.W3',qwise.w3mag,max([0.03d,qwise.e_w3mag]),qwise.e_w3mag, format=fmt
-      if qwise.w4mag gt -9 and finite(qwise.e_w4mag) and (qwise.e_w4mag lt 1d0) then printf, lun,'WISE_WISE.W4',qwise.w4mag,max([0.10d,qwise.e_w4mag]),qwise.e_w4mag, format=fmt
-   endif else begin
-      print, 'No match in WISE by ID in TICv8.2'
-      mindmag = min(abs(q2mass.Kmag-qwise.w1mag),match)
-      sep = angsep(qtic.raj2000*!dpi/180d0,qtic.dej2000*!dpi/180d0,qwise.raj2000*!dpi/180d0, qwise.dej2000*!dpi/180d0)*180d0/!dpi*3600d0 ;; arcsec
-      if mindmag lt 0.5 and sep[match] lt 30d0 then begin
-         qwise = qwise[match]
-         printf, lun, '# No match in WISE by ID in TICv8.2, matched by K-WISE1 mag (' + strtrim(mindmag,2) + ') and separation (' + strtrim(sep[match],2) + '")'
-         if qwise.w1mag gt -9 and finite(qwise.e_w1mag) and (qwise.e_w1mag lt 1d0) then printf, lun,'WISE_WISE.W1',qwise.w1mag,max([0.03d,qwise.e_w1mag]),qwise.e_w1mag, format=fmt
-         if qwise.w2mag gt -9 and finite(qwise.e_w2mag) and (qwise.e_w2mag lt 1d0) then printf, lun,'WISE_WISE.W2',qwise.w2mag,max([0.03d,qwise.e_w2mag]),qwise.e_w2mag, format=fmt
-         if qwise.w3mag gt -9 and finite(qwise.e_w3mag) and (qwise.e_w3mag lt 1d0) then printf, lun,'WISE_WISE.W3',qwise.w3mag,max([0.03d,qwise.e_w3mag]),qwise.e_w3mag, format=fmt
-         if qwise.w4mag gt -9 and finite(qwise.e_w4mag) and (qwise.e_w4mag lt 1d0) then printf, lun,'WISE_WISE.W4',qwise.w4mag,max([0.10d,qwise.e_w4mag]),qwise.e_w4mag, format=fmt
-      endif
-   endelse
-endif
-
-print, ''
-
 
 ; APOGEE-2 DR17 Teff and [m/H] as Gaussian priors
 print, "Querying Abdurro'uf+ (2022; III/286/catalog) for APOGEE-2 DR17 spectroscopic priors..."
@@ -832,13 +825,6 @@ endif else print, "No APOGEE-2 DR17 RV match."
 
 print, ''
 
-;;; Secondary star -- primary star link ;;;
-printf, priorlun, "age_1 age_0 0"
-printf, priorlun, "initfeh_1 initfeh_0 0"
-printf, priorlun, "feh_1 feh_0 0.15"
-printf, priorlun, "distance_1 distance_0 0"
-printf, priorlun, "av_1 av_0 0"
-printf, priorlun, 'errscale_1 errscale_0 0'
 free_lun, priorlun
 free_lun, lun
 if long(tag_exist(qapo,'VHelio',/quiet)) ne 0L then free_lun, rvlun
