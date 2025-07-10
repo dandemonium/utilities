@@ -250,7 +250,7 @@ feh = qtic._m_h_
 ;; this order preserves NaN, sets floor of 0.08
 ufeh = 0.08d0 > qtic.e__m_h_ 
 if finite(feh) and finite(ufeh) then begin
-   printf, priorlun, feh, ufeh, format='("feh",x,"#",x,f0.5,x,f0.5)'
+   printf, priorlun, feh, ufeh, format='("feh",x,f0.5,x,"#", x, f0.5)'
 endif
 
 print, ''
@@ -568,7 +568,7 @@ if ~finite(feh) or ~finite(ufeh) then begin
             printf, lun, '# Stromgren photometry, Paunzen, 2015'
             printf, lun, '# http://adsabs.harvard.edu/abs/2015A%26A...580A..23P'
             printf, priorlun, '# Casagrande+ 2011, eq 2'
-            printf, priorlun, feh, ufeh, format='("feh",x,"#",x,f0.5,x,f0.5)'
+            printf, priorlun, feh, ufeh, format='("feh",x,f0.5,x,"#",x,f0.5)'
          endif else if b_y gt 0.43d0 and b_y lt 0.63d0 and $
             m1 gt 0.07d0 and m1 le 0.68d0 and $
             c1 gt 0.16d0 and c1 le 0.49d0 then begin
@@ -582,7 +582,7 @@ if ~finite(feh) or ~finite(ufeh) then begin
             printf, lun, '# Stromgren photometry, Paunzen, 2015'
             printf, lun, '# http://adsabs.harvard.edu/abs/2015A%26A...580A..23P' 
             printf, priorlun, '# Casagrande+ 2011, eq 3'
-            printf, priorlun, feh, ufeh, format='("feh",x,"#",x,f0.5,x,f0.5)'
+            printf, priorlun, feh, ufeh, format='("feh",x,f0.5,x,"#",x,f0.5)'
          endif      
          
       endif
