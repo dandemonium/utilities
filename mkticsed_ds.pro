@@ -813,9 +813,7 @@ if long(tag_exist(qapo2,'Teff',/quiet)) ne 0L then begin
       printf, priorlun, 'teff_0', teff, eteff
       printf, priorlun, 'logg_0', logg, '#', elogg
       printf, priorlun, 'feh_0', feh, efeh 
-      stop
   endif else if qapo2.Teff gt 0 and not finite(qapo2.Teff,/nan) then begin
-    stop
     printf, priorlun, "### APOGEE DR17 (III/286/catalog) ###"
     printf, priorlun, 'teff_0', qapo2.Teff, qapo2.e_teff 
     printf, priorlun, 'logg_0', qapo2.logg, '#', qapo2.e_logg
