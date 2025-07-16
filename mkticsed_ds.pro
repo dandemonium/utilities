@@ -131,10 +131,8 @@ endif
 
 if keyword_set(france) then cfa = 0B $
 else cfa = 1B
-
+dist = 3d0
 resolve_all, /quiet
-
-if typename(ticid) ne 'STRING' then ticid = string(ticid)
 
 ;; match RA/Dec to TICv8 (closest)
 if n_elements(ra) ne 0 and n_elements(dec) ne 0 then begin
@@ -161,7 +159,7 @@ if ~keyword_set(galex7) and ~keyword_set(galex5) then begin ; by default, get GA
    galex5 = 0B
    galex7 = 1B 
 endif else if ~keyword_set(galex5) then galex5 = 0B
-dist = 120d0
+;dist = 120d0
 galdist=dist
 
 ;; prior file
@@ -175,10 +173,12 @@ printf, lun, '# band_name magnitude used_errors catalog_errors stars'
 
 ;; query TICv8 for the TIC ID
 if strtrim(long(ticid),2) eq ticid then begin
+   print, "Using TIC ID as provided."
    qtic = Exofast_Queryvizier('IV/39/tic82','TIC ' + strtrim(ticid,2),/allcolumns,cfa=cfa)
 endif else begin
    ;; query by supplied name (less robust)
    print, 'WARNING: querying by name is less robust than querying by TIC ID and may lead to misidentification'
+   print, 'Name: ', strtrim(ticid,2)
    qtic = Exofast_Queryvizier('IV/39/tic82',ticid,2d0,/allcolumns,cfa=cfa)
    qgaia = Exofast_Queryvizier('I/345/gaia2',ticid,2d0,/allcolumns,cfa=cfa)   
 
@@ -410,7 +410,7 @@ print, ''
 ;; DR3
 qgaia3=Exofast_Queryvizier('I/355/gaiadr3',star,dist/60.,/silent,cfa=cfa,/all)
 if (size(qgaia3))[2] eq 8 then begin
-   match = where(qgaia3.gmag eq max(qgaia3.gmag))
+   match = where(qgaia3.gmag eq min(qgaia3.gmag))
    if match ne -1 then begin
       qgaia3 = qgaia3[match]
       gaiaid = qgaia3.dr3name
@@ -619,6 +619,7 @@ endif else begin
 endelse
 print, ''
 ; UCAC4
+
 if keyword_set(ucac) then begin 
    print, 'Querying UCAC4/APASS (Zacharias+2012; I/322A/out) for BVgri...'
    qucac4=Exofast_Queryvizier('UCAC4',star,dist/60.,/silent,/all,cfa=cfa)
@@ -683,6 +684,27 @@ endif else begin
 endelse
 
 print, ''
+
+if keyword_set(skymapper) then begin
+   print, 'Querying SkyMapper DR4 (Onken+ 2024; II/379/smssdr4) for uvgriz...'
+   qsmss4=Exofast_Queryvizier('II/379/smssdr4',star,dist/60.,/silent,/all,cfa=cfa) 
+   if long(tag_exist(qsmss4,'gPSF',/quiet)) ne 0L then begin
+      if n_elements(qsmss4) gt 1 then begin
+         print,'Warning: More than 1 SkyMapper DR4 source found; using nearest one only.'
+         printf, lun,'# Warning: More than 1 SkyMapper DR4 source found; using nearest one only.'
+         junk = min(qsmss4._r,m)
+         qsmss4=qsmss4[m]
+      endif
+      printf, lun, '# SkyMapper DR4 (Onken+ 2024)'
+ ;     printf, lun, '# http://adsabs.harvard.edu/abs/2016yCat.2336....0H'
+      if qsmss4.u_psf ne -9 and qsmss4.e_u_psf ne 99 then printf, lun, '#', 'SkyMapper_SkyMapper_u', qsmss4.u_psf, max([0.02d,qsmss4.e_u_psf]), qmss4.e_u_psf
+      if qsmss4.v_psf ne -9 and qsmss4.e_v_psf ne 99 then printf, lun, '#', 'SkyMapper_SkyMapper_v', qsmss4.v_psf, max([0.02d,qsmss4.e_v_psf]), qmss4.e_v_psf
+      if qsmss4.g_psf ne -9 and qsmss4.e_g_psf ne 99 then printf, lun, '#', 'SkyMapper_SkyMapper_g', qsmss4.g_psf, max([0.02d,qsmss4.e_g_psf]), qmss4.e_g_psf
+      if qsmss4.r_psf ne -9 and qsmss4.e_r_psf ne 99 then printf, lun, '#', 'SkyMapper_SkyMapper_r', qsmss4.r_psf, max([0.02d,qsmss4.e_r_psf]), qmss4.e_r_psf
+      if qsmss4.i_psf ne -9 and qsmss4.e_i_psf ne 99 then printf, lun, '#', 'SkyMapper_SkyMapper_i', qsmss4.i_psf, max([0.02d,qsmss4.e_i_psf]), qmss4.e_i_psf
+      if qsmss4.z_psf ne -9 and qsmss4.e_z_psf ne 99 then printf, lun, '#', 'SkyMapper_SkyMapper_z', qsmss4.z_psf, max([0.02d,qsmss4.e_z_psf]), qmss4.e_z_psf
+   endif
+endif
 
 ; KIS DR2
 print, 'Querying Kepler-INT Survey DR2 (Greiss+2012; J/AJ/144/24/kisdr2) for Ugri...'
@@ -764,9 +786,10 @@ print, ''
 
 ; APOGEE-2 DR17 Teff and [m/H] as Gaussian priors
 print, "Querying Abdurro'uf+ (2022; III/286/catalog) for APOGEE-2 DR17 spectroscopic priors..."
-print, 'Note: Matching is done by nearest neighbor with [unknown] failure rate'
+print, 'Note: Matching is done by nearest neighbor with [unknownist] failure rate'
 qapo2=Queryvizier('III/286/catalog',star,dist/60.,/silent,cfa=cfa,/all)
 if n_elements(qapo2) gt 1 then begin ; multiple matches. Just take the closest.
+   print, "Multiple APOGEE-2 DR17 matches. Selecting closest ones
    index = where(qapo2[*]._r eq min(qapo2[*]._r))
    qapo2 = qapo2[index]
 endif
@@ -790,8 +813,9 @@ if long(tag_exist(qapo2,'Teff',/quiet)) ne 0L then begin
       printf, priorlun, 'teff_0', teff, eteff
       printf, priorlun, 'logg_0', logg, '#', elogg
       printf, priorlun, 'feh_0', feh, efeh 
-      
+      stop
   endif else if qapo2.Teff gt 0 and not finite(qapo2.Teff,/nan) then begin
+    stop
     printf, priorlun, "### APOGEE DR17 (III/286/catalog) ###"
     printf, priorlun, 'teff_0', qapo2.Teff, qapo2.e_teff 
     printf, priorlun, 'logg_0', qapo2.logg, '#', qapo2.e_logg
