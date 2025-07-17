@@ -444,9 +444,11 @@ if (size(qgaia3))[2] eq 8 then begin
             printf, priorlun, "#   NOTE: the Gaia DR3 parallax (" + strtrim(qgaia3.plx,2) + ") has been corrected by subtracting " + strtrim(zpt,2) + " mas as prescribed in Lindegren+(2021)."
             ;printf, priorlun, "# NOTE: the Gaia DR3 parallax uncertainty (" + strtrim(qgaia3.e_plx,2) + ") has been added in quadrature with 0.01 to account for remaining systematic residuals"
             printf, priorlun, qgaia3.plx-zpt, uplx, format='("parallax",x,f0.5,x,f0.5)'            
+            printf, priorlun, 1000/(qgaia3.plx-zpt), format='("distance",x,f0.5)'           
          endif else begin
             printf, priorlun, "#   NOTE: the Gaia DR3 parallax could not be corrected and is raw from the catalog."
             printf, priorlun, qgaia3.plx, uplx, format='("parallax",x,f0.5,x,f0.5)'
+            printf, priorlun, 1000/qgaia3.plx, format='("distance",x,f0.5)'           
          endelse
       endif else if dr2str ne '' then begin
          printf, priorlun, "#   DR3 parallax unavailable. Using DR2 parallax"
