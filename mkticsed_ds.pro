@@ -155,10 +155,15 @@ if n_elements(priorfile) eq 0 then priorfile = ticid + '.priors'
 if n_elements(sedfile) eq 0 then sedfile = ticid + '.sed'
 if n_elements(gaiaspfile) eq 0 then gaiaspfile = ticid + '.Gaia.sed'
 if n_elements(rvfile) eq 0 then rvfile = ticid + '.APOGEE-2.DR17.rv'
-if ~keyword_set(galex7) and ~keyword_set(galex5) then begin ; by default, get GALEX GR6+7 over GR5
-   galex5 = 0B
-   galex7 = 1B 
-endif else if ~keyword_set(galex5) then galex5 = 0B
+if ~keyword_set(galex7) then begin
+   if ~keyword_set(galex5) then begin ; by default, get GALEX GR6+7 over GR5
+      galex5 = 0B
+      galex7 = 1B
+   endif else begin
+      galex5 = 1B
+      galex7 = 0B
+   endelse
+endif; else if ~keyword_set(galex5) then galex5 = 0B
 ;dist = 120d0
 galdist=dist
 
@@ -301,13 +306,18 @@ catch, /cancel
 print, ''
 
 ;; get GALEX -- by default, skip; models are unreliable here
+
+fuv_ab2vega = -2.223 ; Bianchi (2011), ApSS, 335, 51
+nuv_ab2vega = -1.699
+
 if galex5 then begin
    print, 'Querying Bianchi+ (2011; II/312/ais) for GALEX GR5 FUV and NUV...'
    qgalex=Exofast_Queryvizier('II/312/ais',star,galdist/60d0,/silent,/all,cfa=cfa)
    if long(tag_exist(qgalex,'fuv',/quiet)) ne 0L then begin
       printf, lun, '# GALEX DR5 (Bianchi+2011; II/312/ais):'
       printf, lun, '# Note: Atmospheric models are generally untrustworthy in the UV. Including UV photometry may bias the fit.'
-      printf, lun, '# Matching is done by nearest neighbor with ~10% failure rate.'
+      print, '# Matching is done by nearest neighbor with ~10% failure rate.'
+      printf, lun, '# Converted from AB to Vega (FUV=AB-2.233, NUV=AB-1.699)
       if n_elements(qgalex) gt 1 then begin
          print,'Warning: More than 1 GALEX source found; using nearest one only.'
          printf, lun,'# Warning: More than 1 GALEX source found; using nearest one only.'
@@ -315,13 +325,13 @@ if galex5 then begin
          qgalex=qgalex[m]
      endif
       if qgalex.fuv gt -99 and finite(qgalex.e_fuv) then begin
-         line = string('GALEX_GALEX.FUV', qgalex.fuv, max([0.1d,qgalex.e_fuv]), qgalex.e_fuv, format=fmt)
+         line = string('GALEX_GALEX.FUV', qgalex.fuv + fuv_ab2vega, max([0.1d,qgalex.e_fuv]), qgalex.e_fuv, format=fmt)
          printf, lun, line
 ;         if galex5 then printf, lun, line $
 ;         else printf, lun, '#     ' + line
       endif
       if qgalex.nuv gt -99 and finite(qgalex.e_nuv) then begin
-         line = string('GALEX_GALEX.NUV', qgalex.nuv, max([0.1d,qgalex.e_nuv]), qgalex.e_nuv, format=fmt)
+         line = string('GALEX_GALEX.NUV', qgalex.nuv + nuv_ab2vega, max([0.1d,qgalex.e_nuv]), qgalex.e_nuv, format=fmt)
          printf, lun, line
 ;         if galex5 then printf, lun, line $
 ;         else printf, lun, '#     ' + line
@@ -340,7 +350,8 @@ qgalex=QueryVizier('II/335/galex_ais',star,galdist/60d0,/silent,/all,cfa=cfa)
 if long(tag_exist(qgalex,'fuvmag',/quiet)) ne 0L then begin
    printf, lun, '# GALEX GR6+7 (Bianchi+2017; II/335/galex_ais):'
    printf, lun, '# Note: Atmospheric models are generally untrustworthy in the UV. Including UV photometry may bias the fit.'
-   printf, lun, '# Matching is done by nearest neighbor with ~10% failure rate.'
+   print, '# Matching is done by nearest neighbor with ~10% failure rate.'
+   printf, lun, '# Converted from AB to Vega (FUV=AB-2.233, NUV=AB-1.699)
    if n_elements(qgalex) gt 1 then begin
       print,'Warning: More than 1 GALEX source found; using nearest one only.'
       printf, lun,'# Warning: More than 1 GALEX source found; using nearest one only.'
@@ -348,13 +359,13 @@ if long(tag_exist(qgalex,'fuvmag',/quiet)) ne 0L then begin
       qgalex=qgalex[m]
    endif
    if qgalex.fuvmag gt -99 and finite(qgalex.e_fuvmag) then begin
-      line = string('GALEX_GALEX.FUV',qgalex.fuvmag,max([0.1d,qgalex.e_fuvmag]),qgalex.e_fuvmag, format=fmt)
+      line = string('GALEX_GALEX.FUV',qgalex.fuvmag + fuv_ab2vega,max([0.1d,qgalex.e_fuvmag]),qgalex.e_fuvmag, format=fmt)
       if galex7 then printf, lun, line $
       else  printf, lun, '#     ' + line
      
    endif
    if qgalex.nuvmag gt -99 and finite(qgalex.e_nuvmag) then begin
-      line = string('GALEX_GALEX.NUV',qgalex.nuvmag,max([0.1d,qgalex.e_nuvmag]),qgalex.e_nuvmag, format=fmt)
+      line = string('GALEX_GALEX.NUV',qgalex.nuvmag + nuv_ab2vega,max([0.1d,qgalex.e_nuvmag]),qgalex.e_nuvmag, format=fmt)
       if galex7 then printf, lun, line $
       else  printf, lun, '#     ' + line
    endif
