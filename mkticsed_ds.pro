@@ -16,7 +16,7 @@ if n_params() lt 8 then begin
   retall
 endif
 
-y = V
+y = VUgh -- an
 b = V + by 
 u = V + 3*by + 2*m1 + c1
 v = V + 2*by + m1
@@ -106,8 +106,8 @@ end
 pro mkticsed_ds, ticid, priorfile=priorfile, sedfile=sedfile, gaiaspfile=gaiaspfile, france=france, ra=ra, dec=dec, $
               apass=apass, galex5=galex5, galex7=galex7, ucac=ucac, merm=merm, stromgren=stromgren, kepler=kepler, notycho=notycho, rvfile=rvfile
 
-if !version.os_family eq 'Windows' then $
-   message,'This program relies on queryvizier, which is not supported in Windows'
+;if !version.os_family eq 'Windows' then $
+;   message,'This program relies on queryvizier, which is not supported in Windows'
 
 !except=0
 
