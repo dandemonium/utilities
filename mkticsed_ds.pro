@@ -16,7 +16,7 @@ if n_params() lt 8 then begin
   retall
 endif
 
-y = VUgh -- an
+y = V
 b = V + by 
 u = V + 3*by + 2*m1 + c1
 v = V + 2*by + m1
