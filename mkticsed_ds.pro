@@ -106,8 +106,8 @@ end
 pro mkticsed_ds, ticid, priorfile=priorfile, sedfile=sedfile, gaiaspfile=gaiaspfile, france=france, ra=ra, dec=dec, $
               apass=apass, galex5=galex5, galex7=galex7, ucac=ucac, merm=merm, stromgren=stromgren, kepler=kepler, notycho=notycho, rvfile=rvfile
 
-;if !version.os_family eq 'Windows' then $
-;   message,'This program relies on queryvizier, which is not supported in Windows'
+if !version.os_family eq 'Windows' then $
+   message,'This program relies on queryvizier, which is not supported in Windows'
 
 !except=0
 
@@ -173,6 +173,7 @@ printf, priorlun, '#### TICv8.2 ####'
 
 ;; open the SED file for writing
 fmt = '(a21,x,f9.6,x,f0.6,x,f0.6)'
+fmt_kis = '(a22,x,f9.6,x,f0.6,x,f0.6)'
 openw, lun, sedfile, /get_lun
 printf, lun, '# band_name magnitude used_errors catalog_errors stars'
 
@@ -488,11 +489,11 @@ qgaiasp=Exofast_Queryvizier('I/355/xpsample',star,dist/60.,/silent,cfa=cfa,/all)
 if (size(qgaiasp))[2] eq 8 then begin
    match = where(qgaiasp.source eq qgaia3.source)
    if match[0] ne -1 then begin
-      ;; Gaia lambda in nm, Gaia flux in W/m^2/Hz
+      ;; Gaia lambda in nm, Gaia flux in W/m^2/nm
       ;; SED plot in microns, erg/s/cm^2
       ;; interpolate onto atmosphere wavelength scale now?
-      flux = qgaiasp[match].flux*1d3*qgaiasp[match].lambda ;; W/m^2/Hz -> erg/s/cm^2
-      fluxerr = qgaiasp[match].e_flux*1d3*qgaiasp[match].lambda ;; W/m^2/Hz -> erg/s/cm^2
+      flux = qgaiasp[match].flux*1d3*qgaiasp[match].lambda ;; W/m^2/nm -> erg/s/cm^2
+      fluxerr = qgaiasp[match].e_flux*1d3*qgaiasp[match].lambda ;; W/m^2/nm -> erg/s/cm^2
       lambda = qgaiasp[match].lambda/1d3 ;; nm -> um
       exofast_forprint, lambda, flux, fluxerr, $
                         textout=gaiaspfile,/nocomment,format='(f5.3,x,e12.6,x,e12.6)'
@@ -735,10 +736,10 @@ if long(tag_exist(qkis,'KIS',/quiet)) ne 0L then begin
    
    if keyword_set(kepler) then comment = '' else comment = '#      '
    
-   if qkis.umag gt -9 and finite(qkis.e_umag) then printf, lun,comment+'INT_WFC.RGO_U',qkis.umag,max([0.02d,qkis.e_umag]),qkis.e_umag, format=fmt
-   if qkis.gmag gt -9 and finite(qkis.e_gmag) then printf, lun,comment+' INT_WFC.Gunn_g',qkis.gmag,max([0.02d,qkis.e_gmag]),qkis.e_gmag, format=fmt
-   if qkis.rmag gt -9 and finite(qkis.e_rmag) then printf, lun,comment+' INT_WFC.Gunn_r',qkis.rmag,max([0.02d,qkis.e_rmag]),qkis.e_rmag, format=fmt
-   if qkis.imag gt -9 and finite(qkis.e_imag) then printf, lun,comment+' INT_WFC.Gunn_i',qkis.imag,max([0.02d,qkis.e_imag]),qkis.e_imag, format=fmt
+   if qkis.umag gt -9 and finite(qkis.e_umag) then printf, lun,comment+'INT_WFC.RGO_U',qkis.umag,max([0.02d,qkis.e_umag]),qkis.e_umag, format=fmt_kis
+   if qkis.gmag gt -9 and finite(qkis.e_gmag) then printf, lun,comment+' INT_WFC.Gunn_g',qkis.gmag,max([0.02d,qkis.e_gmag]),qkis.e_gmag, format=fmt_kis
+   if qkis.rmag gt -9 and finite(qkis.e_rmag) then printf, lun,comment+' INT_WFC.Gunn_r',qkis.rmag,max([0.02d,qkis.e_rmag]),qkis.e_rmag, format=fmt_kis
+   if qkis.imag gt -9 and finite(qkis.e_imag) then printf, lun,comment+' INT_WFC.Gunn_i',qkis.imag,max([0.02d,qkis.e_imag]),qkis.e_imag, format=fmt_kis
 endif else begin
    print, 'No KIS DR2 (Greiss+2012) match.'
    qkis={umag:-99.,gmag:-99.,rmag:-99.,imag:-99.}
