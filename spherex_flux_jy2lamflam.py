@@ -16,11 +16,12 @@ def convert_to_lamflam(lam, f_ujy):
 		flam = beta * fnu / lam"""
 
 	beta = 3e-9 #to get erg/s/cm^2/um
-	return np.float64((beta*f_ujy*1e-6)/lam)
+	return np.float64((beta*f_ujy*1e-6)/lam) #/(lam**2.)
 	
 fname = sys.argv[1]
 star = sys.argv[2]
-lam, width, flux_ujy, flux_err_ujy = np.loadtxt(fname, unpack=True, comments='#')
+
+lam, width, flux_ujy, flux_err_ujy = np.loadtxt(fname, unpack=True, comments='#', skiprows=1,usecols=(13,14,15,16))
 f_cgs = convert_to_lamflam(lam, flux_ujy)
 f_err_cgs = convert_to_lamflam(lam, flux_err_ujy)
-np.savetxt(star+".SPHEREx.sed", np.array([lam,f_cgs,f_err_cgs]).transpose(), fmt=('%.8f','%.8e','%.8e'), delimiter='\t')
+np.savetxt(star+".SPHEREx.sed", np.array([lam,f_cgs,f_err_cgs]).transpose(), fmt=('%.8f','%.8e','%.8e'), delimiter='\t')#overwrite=True)
