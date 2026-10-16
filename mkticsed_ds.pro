@@ -103,8 +103,9 @@ end
 ;  2023/02 -- Documented.
 ;-
 
-pro mkticsed_ds, ticid, priorfile=priorfile, sedfile=sedfile, gaiaspfile=gaiaspfile, france=france, ra=ra, dec=dec, $
-              apass=apass, galex5=galex5, galex7=galex7, ucac=ucac, merm=merm, stromgren=stromgren, kepler=kepler, notycho=notycho, rvfile=rvfile
+pro mkticsed_ds, ticid, priorfile=priorfile, sedfile=sedfile, mistsedfile=mistsedfile, gaiaspfile=gaiaspfile, france=france, ra=ra, dec=dec, $
+              apass=apass, galex5=galex5, galex7=galex7, ucac=ucac, merm=merm, stromgren=stromgren, kepler=kepler, notycho=notycho, rvfile=rvfile, $
+              dist=dist, cfa=cfa
 
 if !version.os_family eq 'Windows' then $
    message,'This program relies on queryvizier, which is not supported in Windows'
@@ -121,6 +122,7 @@ if lmgr(/vm) or lmgr(/runtime) then begin
          entries = strsplit(par[i],'=',/extract)
          if strupcase(entries[0]) eq 'PRIORFILE' then priorfile = strtrim(entries[1],2)
          if strupcase(entries[0]) eq 'SEDFILE' then sedfile = strtrim(entries[1],2)
+         if strupcase(entries[0]) eq 'MISTSEDFILE' then mistsedfile = strtrim(entries[1],2)
          if strupcase(entries[0]) eq 'FRANCE' then france = long(entries[1])
          if strupcase(entries[0]) eq 'RA' then ra = double(entries[1])
          if strupcase(entries[0]) eq 'DEC' then dec = double(entries[1])
@@ -131,14 +133,14 @@ endif
 
 if keyword_set(france) then cfa = 0B $
 else cfa = 1B
-dist = 3d0
+if ~keyword_set(dist) then dist = 6d0
 resolve_all, /quiet
 
 ;; match RA/Dec to TICv8 (closest)
 if n_elements(ra) ne 0 and n_elements(dec) ne 0 then begin
    print, 'WARNING: querying by RA/Dec is less robust than querying by TIC ID and may lead to misidentification'   
-;   qtic = exofast_queryvizier('IV/38/tic',[ra,dec],2d0, /silent, /all, cfa=cfa)
-   qtic = exofast_queryvizier('IV/39/tic82',[ra,dec],2d0, /silent, /all, cfa=cfa)
+;   qtic = exofast_queryvizier('IV/38/tic',[ra,dec], 0.05, /silent, /all, cfa=cfa)
+   qtic = exofast_queryvizier('IV/39/tic82',[ra,dec], 0.05, /silent, /all, cfa=cfa)
    if (size(qtic))[2] ne 8 then begin
       print, 'No match to ' + string(ra,dec,format='(f0.8,",",f0.8)')
       return
@@ -153,6 +155,7 @@ print, ''
 if n_elements(ticid) eq 0 then message, 'TICID is required'
 if n_elements(priorfile) eq 0 then priorfile = ticid + '.priors'
 if n_elements(sedfile) eq 0 then sedfile = ticid + '.sed'
+if n_elements(mistsedfile) eq 0 then mistsedfile = ticid + '.mistsed'
 if n_elements(gaiaspfile) eq 0 then gaiaspfile = ticid + '.Gaia.sed'
 if n_elements(rvfile) eq 0 then rvfile = ticid + '.APOGEE-2.DR17.rv'
 if ~keyword_set(galex7) then begin
@@ -163,7 +166,7 @@ if ~keyword_set(galex7) then begin
       galex5 = 1B
       galex7 = 0B
    endelse
-endif; else if ~keyword_set(galex5) then galex5 = 0B
+endif else if ~keyword_set(galex5) then galex5 = 0B
 ;dist = 120d0
 galdist=dist
 
@@ -171,22 +174,26 @@ galdist=dist
 openw, priorlun, priorfile, /get_lun
 printf, priorlun, '#### TICv8.2 ####'
 
-;; open the SED file for writing
-fmt = '(a21,x,f9.6,x,f0.6,x,f0.6)'
+;; open the SED files for writing
+fmt = '(a23,x,f9.6,x,f0.6,x,f0.6)'
 fmt_kis = '(a22,x,f9.6,x,f0.6,x,f0.6)'
 openw, lun, sedfile, /get_lun
 printf, lun, '# band_name magnitude used_errors catalog_errors stars'
-
+openw, mistlun, mistsedfile, /get_lun
+printf, mistlun, '# band_name magnitude used_errors catalog_errors stars'
+lunarr = [lun, mistlun]
 ;; query TICv8 for the TIC ID
 if strtrim(long(ticid),2) eq ticid then begin
    print, "Using TIC ID as provided."
    qtic = Exofast_Queryvizier('IV/39/tic82','TIC ' + strtrim(ticid,2),/allcolumns,cfa=cfa)
+   ra = qtic.RAJ2000
+   dec = qtic.DEJ2000
 endif else begin
    ;; query by supplied name (less robust)
    print, 'WARNING: querying by name is less robust than querying by TIC ID and may lead to misidentification'
    print, 'Name: ', strtrim(ticid,2)
    qtic = Exofast_Queryvizier('IV/39/tic82',ticid,2d0,/allcolumns,cfa=cfa)
-   qgaia = Exofast_Queryvizier('I/345/gaia2',ticid,2d0,/allcolumns,cfa=cfa)   
+   qgaia = Exofast_Queryvizier('I/345/gaia2',ticid,2d0,/allcolumns,cfa=cfa)
 
    if (size(qgaia))[2] ne 8 then begin
       message, 'no matching star found. try using the TIC ID directly'
@@ -271,14 +278,16 @@ print, ''
 ;; warn the user if this target appears in the Washington Double Star catalog
 qwds = Exofast_Queryvizier('B/wds/wds','TIC ' + ticid,2d0,/allcolumns,cfa=cfa)
 if (size(qwds))[2] eq 8 then begin
-   printf, lun, '# WARNING: this star appears in the Washington Double Star catalog'
-   printf, lun, '# WARNING: this star is a visual binary with separation ' + strtrim(qwds.sep2,2)
-   printf, lun, '# WARNING: unresolved photometry will bias the SED and the whole fit'
+   for l=0, n_elements(lunarr)-1 do begin
+      printf, lunarr[l], '# WARNING: this star appears in the Washington Double Star catalog'
+      printf, lunarr[l], '# WARNING: this star is a visual binary with separation ' + strtrim(qwds.sep2,2)
+      printf, lunarr[l], '# WARNING: unresolved photometry will bias the SED and the whole fit'
+   endfor
 endif
 
 print, ''
 
-;; extinction prior 
+;; extinction prior
 ;; Use TICv8 Gaussian prior if availble
 ;; upper limit from the Schlegel dust map if not
 av = qtic.e_b_v*3.1d0
@@ -293,11 +302,11 @@ endif else begin
    if av_error ne 0 then begin
       print, 'Error index:', av_error
       print, 'Error message: ', !ERROR_STATE.MSG
-     
+
       line='# IRSA Dust Map query may have failed! Get the S&F A_{v,max} manually from https://irsa.ipac.caltech.edu/applications/DUST/'
       goto, skipav
    endif
-      
+
    junk = getavprior(ra=qtic.raj2000, dec=qtic.dej2000, line=line)
    printf, priorlun, line
 endelse
@@ -313,29 +322,31 @@ nuv_ab2vega = -1.699
 
 if galex5 then begin
    print, 'Querying Bianchi+ (2011; II/312/ais) for GALEX GR5 FUV and NUV...'
-   qgalex=Exofast_Queryvizier('II/312/ais',star,galdist/60d0,/silent,/all,cfa=cfa)
+   qgalex=Exofast_Queryvizier('II/312/ais',star,galdist,/silent,/all,cfa=cfa)
    if long(tag_exist(qgalex,'fuv',/quiet)) ne 0L then begin
-      printf, lun, '# GALEX DR5 (Bianchi+2011; II/312/ais):'
-      printf, lun, '# Note: Atmospheric models are generally untrustworthy in the UV. Including UV photometry may bias the fit.'
-      print, '# Matching is done by nearest neighbor with ~10% failure rate.'
-      printf, lun, '# Converted from AB to Vega (FUV=AB-2.233, NUV=AB-1.699)
-      if n_elements(qgalex) gt 1 then begin
-         print,'Warning: More than 1 GALEX source found; using nearest one only.'
-         printf, lun,'# Warning: More than 1 GALEX source found; using nearest one only.'
-         junk = min(qgalex._r,m)
-         qgalex=qgalex[m]
-     endif
+      for l=0, n_elements(lunarr)-1 do begin
+         printf, lunarr[l], '# GALEX DR5 (Bianchi+2011; II/312/ais):'
+         printf, lunarr[l], '# Note: Atmospheric models are generally untrustworthy in the UV. Including UV photometry may bias the fit.'
+         print, '# Matching is done by nearest neighbor with ~10% failure rate.'
+         printf, lunarr[l], '# Converted from AB to Vega (FUV=AB-2.233, NUV=AB-1.699)
+         if n_elements(qgalex) gt 1 then begin
+               print,'Warning: More than 1 GALEX source found; using nearest one only.'
+            printf, lunarr[l],'# Warning: More than 1 GALEX source found; using nearest one only.'
+            junk = min(qgalex._r,m)
+            qgalex=qgalex[m]
+         endif
+      endfor
       if qgalex.fuv gt -99 and finite(qgalex.e_fuv) then begin
          line = string('GALEX_GALEX.FUV', qgalex.fuv + fuv_ab2vega, max([0.1d,qgalex.e_fuv]), qgalex.e_fuv, format=fmt)
          printf, lun, line
-;         if galex5 then printf, lun, line $
-;         else printf, lun, '#     ' + line
+         line = string('GALEX_FUV', qgalex.fuv + fuv_ab2vega, max([0.1d,qgalex.e_fuv]), qgalex.e_fuv, format=fmt)
+         printf, mistlun, line
       endif
       if qgalex.nuv gt -99 and finite(qgalex.e_nuv) then begin
          line = string('GALEX_GALEX.NUV', qgalex.nuv + nuv_ab2vega, max([0.1d,qgalex.e_nuv]), qgalex.e_nuv, format=fmt)
          printf, lun, line
-;         if galex5 then printf, lun, line $
-;         else printf, lun, '#     ' + line
+         line = string('GALEX_NUV', qgalex.nuv + nuv_ab2vega, max([0.1d,qgalex.e_nuv]), qgalex.e_nuv, format=fmt)
+         printf, mistlun, line
       endif
    endif else begin
       qgalex={fuv_6:-99.,nuv_6:-99.}
@@ -347,29 +358,44 @@ endif
 
 
 print, 'Querying Bianchi+ (2017; II/335/galex_ais) for GALEX GR7 FUV and NUV...'
-qgalex=QueryVizier('II/335/galex_ais',star,galdist/60d0,/silent,/all,cfa=cfa)
+qgalex=Exofast_Queryvizier('II/335/galex_ais',star,galdist,/silent,/all,cfa=cfa)
 if long(tag_exist(qgalex,'fuvmag',/quiet)) ne 0L then begin
-   printf, lun, '# GALEX GR6+7 (Bianchi+2017; II/335/galex_ais):'
-   printf, lun, '# Note: Atmospheric models are generally untrustworthy in the UV. Including UV photometry may bias the fit.'
    print, '# Matching is done by nearest neighbor with ~10% failure rate.'
-   printf, lun, '# Converted from AB to Vega (FUV=AB-2.233, NUV=AB-1.699)
-   if n_elements(qgalex) gt 1 then begin
-      print,'Warning: More than 1 GALEX source found; using nearest one only.'
-      printf, lun,'# Warning: More than 1 GALEX source found; using nearest one only.'
-      junk = min(qgalex._r,m)
-      qgalex=qgalex[m]
-   endif
+   for l=0, n_elements(lunarr)-1 do begin
+      printf, lunarr[l], '# GALEX GR6+7 (Bianchi+2017; II/335/galex_ais):'
+      printf, lunarr[l], '# Note: Atmospheric models are generally untrustworthy in the UV. Including UV photometry may bias the fit.'
+ ;     printf, lunarr[l], '# Converted from AB to Vega (FUV=AB-2.233, NUV=AB-1.699)
+      if n_elements(qgalex) gt 1 then begin
+         if l eq lun then print,'Warning: More than 1 GALEX source found; using nearest one only.'
+         printf, lunarr[l],'# Warning: More than 1 GALEX source found; using nearest one only.'
+         junk = min(qgalex._r,m)
+         qgalex=qgalex[m]
+      endif
+   endfor
    if qgalex.fuvmag gt -99 and finite(qgalex.e_fuvmag) then begin
-      line = string('GALEX_GALEX.FUV',qgalex.fuvmag + fuv_ab2vega,max([0.1d,qgalex.e_fuvmag]),qgalex.e_fuvmag, format=fmt)
+;      line = string('GALEX_GALEX.FUV',qgalex.fuvmag + fuv_ab2vega,max([0.1d,qgalex.e_fuvmag]),qgalex.e_fuvmag, format=fmt)
+      line = string('GALEX_GALEX.FUV',qgalex.fuvmag,max([0.1d,qgalex.e_fuvmag]),qgalex.e_fuvmag, format=fmt)
       if galex7 then printf, lun, line $
       else  printf, lun, '#     ' + line
-     
+;      line = string('GALEX_FUV',qgalex.fuvmag + fuv_ab2vega,max([0.1d,qgalex.e_fuvmag]),qgalex.e_fuvmag, format=fmt)
+      line = string('GALEX_FUV',qgalex.fuvmag,max([0.1d,qgalex.e_fuvmag]),qgalex.e_fuvmag, format=fmt)
+
+      if galex7 then printf, mistlun, line $
+      else  printf, mistlun, '#     ' + line
    endif
    if qgalex.nuvmag gt -99 and finite(qgalex.e_nuvmag) then begin
-      line = string('GALEX_GALEX.NUV',qgalex.nuvmag + nuv_ab2vega,max([0.1d,qgalex.e_nuvmag]),qgalex.e_nuvmag, format=fmt)
+;      line = string('GALEX_GALEX.NUV',qgalex.nuvmag + nuv_ab2vega,max([0.1d,qgalex.e_nuvmag]),qgalex.e_nuvmag, format=fmt)
+      line = string('GALEX_GALEX.NUV',qgalex.nuvmag,max([0.1d,qgalex.e_nuvmag]),qgalex.e_nuvmag, format=fmt)
+
       if galex7 then printf, lun, line $
       else  printf, lun, '#     ' + line
-   endif
+;      line = string('GALEX_NUV',qgalex.nuvmag + nuv_ab2vega,max([0.1d,qgalex.e_nuvmag]),qgalex.e_nuvmag, format=fmt)
+      line = string('GALEX_NUV',qgalex.nuvmag,max([0.1d,qgalex.e_nuvmag]),qgalex.e_nuvmag, format=fmt)
+
+      if galex7 then printf, mistlun, line $
+      else  printf, mistlun, '#     ' + line
+
+      endif
 endif else begin
    qgalex={fuv_6:-99.,nuv_6:-99.}
    print, "No GALEX GR6+7 match."
@@ -467,10 +493,18 @@ if (size(qgaia3))[2] eq 8 then begin
          printf, priorlun, dr2str
       endif
       comment = '#        '
-      if qgaia3.gmag gt -9 and finite(qgaia3.e_gmag) and (qgaia3.e_gmag lt 1d0)  then printf, lun, comment + 'GAIA_GAIA3.G', qgaia3.gmag, max([0.02d,qgaia3.e_gmag]), qgaia3.e_gmag,  format=fmt
-      comment = '#      '
-      if qgaia3.bpmag gt -9 and finite(qgaia3.e_bpmag) and (qgaia3.e_bpmag lt 1d0) then printf, lun, comment + 'GAIA_GAIA3.Gbp', qgaia3.bpmag, max([0.02d,qgaia3.e_bpmag]), qgaia3.e_bpmag,  format=fmt
-      if qgaia3.rpmag gt -9 and finite(qgaia3.e_rpmag) and (qgaia3.e_rpmag lt 1d0) then printf, lun, comment + 'GAIA_GAIA3.Grp', qgaia3.rpmag, max([0.02d,qgaia3.e_rpmag]), qgaia3.e_rpmag,  format=fmt      
+      if qgaia3.gmag gt -9 and finite(qgaia3.e_gmag) and (qgaia3.e_gmag lt 1d0) then begin
+         printf, lun, comment + 'GAIA_GAIA3.G', qgaia3.gmag, max([0.02d,qgaia3.e_gmag]), qgaia3.e_gmag,  format=fmt
+         printf, mistlun, comment + 'GAIA_GAIA3.G', qgaia3.gmag, max([0.02d,qgaia3.e_gmag]), qgaia3.e_gmag,  format=fmt
+      endif
+      if qgaia3.bpmag gt -9 and finite(qgaia3.e_bpmag) and (qgaia3.e_bpmag lt 1d0) then begin
+         printf, lun, comment + 'GAIA_GAIA3.Gbp', qgaia3.bpmag, max([0.02d,qgaia3.e_bpmag]), qgaia3.e_bpmag,  format=fmt
+         printf, mistlun, comment + 'GAIA_BP_EDR3', qgaia3.bpmag, max([0.02d,qgaia3.e_bpmag]), qgaia3.e_bpmag,  format=fmt
+      endif
+      if qgaia3.rpmag gt -9 and finite(qgaia3.e_rpmag) and (qgaia3.e_rpmag lt 1d0) then begin
+         printf, lun, comment + 'GAIA_GAIA3.Grp', qgaia3.rpmag, max([0.02d,qgaia3.e_rpmag]), qgaia3.e_rpmag,  format=fmt
+         printf, mistlun, comment + 'GAIA_RP_EDR3', qgaia3.rpmag, max([0.02d,qgaia3.e_rpmag]), qgaia3.e_rpmag,  format=fmt
+      endif
    endif else if dr2str ne '' then begin
       printf, priorlun, "# DR3 parallax unavailable. Using DR2 parallax"
       printf, priorlun, dr2str
@@ -484,8 +518,8 @@ printf, priorlun, '##############'
 print, ''
 
 ;; Gaia spectrophotometry
-print, "Querying Gaia DR3 (I/355/xpsample) for BP/RP spectrophotometry..."
-qgaiasp=Exofast_Queryvizier('I/355/xpsample',star,dist/60.,/silent,cfa=cfa,/all)
+print, "Querying Gaia DR3 (I/355/xpsample) for XP spectrophotometry..."
+qgaiasp=Exofast_Queryvizier('I/355/xpsample',qgaia3.dr3name,dist/60.,/silent,cfa=cfa,/all)
 if (size(qgaiasp))[2] eq 8 then begin
    match = where(qgaiasp.source eq qgaia3.source)
    if match[0] ne -1 then begin
@@ -503,8 +537,8 @@ endif
 print, ''
 
 print, "Querying Gaia DR3 (I/357/tbosb1, I/360/binmass) RV orbital solution for initial guesses (NOT YET SUPPORTED)..."
-qgaiadr3_rv1 = QueryVizier('I/357/tbosb1', star, dist/60., /silent, cfa=cfa, /all)
-qgaiadr3_rv2 = Queryvizier('I/360/binmass', star, dist/60., /silent, cfa=cfa, /all)
+qgaiadr3_rv1 = QueryVizier('I/357/tbosb1', qgaia3.dr3name, dist/60., /silent, cfa=cfa, /all)
+qgaiadr3_rv2 = Queryvizier('I/360/binmass', qgaia3.dr3name, dist/60., /silent, cfa=cfa, /all)
 
 
 print, ''
@@ -514,22 +548,26 @@ print, 'Querying Hog+ (2000; I/259/TYC2) for Tycho-2 B_T and VT,'
 print, 'assuming Mann & von Braun (2015, PASP, 127, 102) passbands for linkpars fits...'
 qtyc2=Exofast_Queryvizier('I/259/TYC2',star,dist/60.,/silent,/all,cfa=cfa)
 if long(tag_exist(qtyc2,'BTMAG',/quiet)) ne 0L then begin
-   printf, lun, '# Tycho catalog, Hog+ (2000; I/259/TYC2)'
-;   printf, lun, '# https://adsabs.harvard.edu/abs/2000A%26A...355L..27H'
-   printf, lun, '# Matching is done by nearest neighbor with ~10% failure rate.'
-   printf, lun, '# Note: Labels are for Mann & von Braun (2015) passband.'
-   if n_elements(qtyc2) gt 1 then begin
-      print,'Warning: More than 1 Tycho-2 source found; using nearest one only.'
-      printf, lun,'# Warning: More than 1 Tycho-2 source found; using nearest one only.'
-      junk = min(qtyc2._r,m)
-      qtyc2=qtyc2[m]
-   endif
+   for l=0, n_elements(lunarr)-1 do begin
+      printf, lunarr[l], '# Tycho catalog, Hog+ (2000; I/259/TYC2)'
+   ;   printf, lunarr[l], '# https://adsabs.harvard.edu/abs/2000A%26A...355L..27H'
+      printf, lunarr[l], '# Matching is done by nearest neighbor with ~10% failure rate.'
+      printf, lunarr[l], '# Note: Labels are for Mann & von Braun (2015) passband.'
+      if n_elements(qtyc2) gt 1 then begin
+         print,'Warning: More than 1 Tycho-2 source found; using nearest one only.'
+         printf, lunarr[l],'# Warning: More than 1 Tycho-2 source found; using nearest one only.'
+         junk = min(qtyc2._r,m)
+         qtyc2=qtyc2[m]
+      endif
+   endfor
    if keyword_set(notycho) then comment = '#   ' else comment = '    '
    if qtyc2.btmag gt -9 and finite(qtyc2.e_btmag) then begin
-      printf, lun,comment+'TYCHO_TYCHO.B_MvB',qtyc2.btmag,max([0.02d,qtyc2.e_btmag]),qtyc2.e_btmag, format=fmt
-   endif      
+      printf, lun, comment+'TYCHO_TYCHO.B_MvB',qtyc2.btmag,max([0.02d,qtyc2.e_btmag]),qtyc2.e_btmag, format=fmt
+      printf, mistlun, comment+'TYCHO_TYCHO.B',qtyc2.btmag,max([0.02d,qtyc2.e_btmag]),qtyc2.e_btmag, format=fmt
+   endif
    if qtyc2.vtmag gt -9 and finite(qtyc2.e_vtmag) then begin
-      printf, lun,comment+'TYCHO_TYCHO.V_MvB',qtyc2.vtmag,max([0.02d,qtyc2.e_vtmag]),qtyc2.e_vtmag, format=fmt
+      printf, lun, comment+'TYCHO_TYCHO.V_MvB',qtyc2.vtmag,max([0.02d,qtyc2.e_vtmag]),qtyc2.e_vtmag, format=fmt
+      printf, mistlun, comment+'TYCHO_TYCHO.V',qtyc2.vtmag,max([0.02d,qtyc2.e_vtmag]),qtyc2.e_vtmag, format=fmt
    endif
 endif else begin
    print, "No Tycho-2 match."
@@ -556,7 +594,7 @@ if ~finite(feh) or ~finite(ufeh) then begin
                                 qpaunzen15.c1,max([0.02d,qpaunzen15.e_c1]),/silent)
             printf, lun, '# Stromgren photometry, Paunzen, 2015'
             printf, lun, '# http://adsabs.harvard.edu/abs/2015A%26A...580A..23P'
-            if keyword_set(stromgren) then comment = '' else comment = '# '
+            if keyword_set(stromgren) then comment = '' else comment = '#  '
             if (ubvymags(0) gt -9) and (ubvymags(1) lt 1d0) then printf, lun, comment+'Generic_Stromgren.u',ubvymags(0),max([0.02d,ubvymags(1)]), format=fmt
             if (ubvymags(2) gt -9) and (ubvymags(3) lt 1d0) then printf, lun, comment+'Generic_Stromgren.v',ubvymags(2),max([0.02d,ubvymags(3)]), format=fmt
             if (ubvymags(4) gt -9) and (ubvymags(5) lt 1d0) then printf, lun, comment+'Generic_Stromgren.b',ubvymags(4),max([0.02d,ubvymags(5)]), format=fmt
