@@ -519,7 +519,7 @@ print, ''
 
 ;; Gaia spectrophotometry
 print, "Querying Gaia DR3 (I/355/xpsample) for XP spectrophotometry..."
-qgaiasp=Exofast_Queryvizier('I/355/xpsample',qgaia3.dr3name,dist/60.,/silent,cfa=cfa,/all)
+qgaiasp=Exofast_Queryvizier('I/355/xpsample',gaiaid,dist/60.,/silent,cfa=cfa,/all)
 if (size(qgaiasp))[2] eq 8 then begin
    match = where(qgaiasp.source eq qgaia3.source)
    if match[0] ne -1 then begin
