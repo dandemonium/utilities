@@ -451,7 +451,7 @@ if (size(qgaia3))[2] eq 8 then begin
    match = where(qgaia3.gmag eq min(qgaia3.gmag))
    if match ne -1 then begin
       qgaia3 = qgaia3[match]
-      gaiaid = qgaia3.dr3name
+      qgaia3id = qgaia3.dr3name
       printf, priorlun, '#### Gaia DR3 ####'
       printf, priorlun, "#   Note: RUWE = " + strtrim(qgaia3.ruwe,2) + " is the renormalized"
       printf, priorlun, "#         sqrt(chi^2/dof) of the astrometric fit. 
@@ -519,7 +519,7 @@ print, ''
 
 ;; Gaia spectrophotometry
 print, "Querying Gaia DR3 (I/355/xpsample) for XP spectrophotometry..."
-qgaiasp=Exofast_Queryvizier('I/355/xpsample',gaiaid,dist/60.,/silent,cfa=cfa,/all)
+qgaiasp=Exofast_Queryvizier('I/355/xpsample',qgaia3id,dist/60.,/silent,cfa=cfa,/all)
 if (size(qgaiasp))[2] eq 8 then begin
    match = where(qgaiasp.source eq qgaia3.source)
    if match[0] ne -1 then begin
@@ -537,8 +537,8 @@ endif
 print, ''
 
 print, "Querying Gaia DR3 (I/357/tbosb1, I/360/binmass) RV orbital solution for initial guesses (NOT YET SUPPORTED)..."
-qgaiadr3_rv1 = QueryVizier('I/357/tbosb1', qgaia3.dr3name, dist/60., /silent, cfa=cfa, /all)
-qgaiadr3_rv2 = Queryvizier('I/360/binmass', qgaia3.dr3name, dist/60., /silent, cfa=cfa, /all)
+qgaiadr3_rv1 = QueryVizier('I/357/tbosb1', qgaia3id, dist/60., /silent, cfa=cfa, /all)
+qgaiadr3_rv2 = Queryvizier('I/360/binmass', qgaia3id, dist/60., /silent, cfa=cfa, /all)
 
 
 print, ''
